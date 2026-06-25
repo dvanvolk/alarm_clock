@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alarm Clock</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="clock-face">
+    <div id="time">--:-- --</div>
+    <div id="date"></div>
+    <div id="day"></div>
+    <div id="next-alarm"></div>
+
+    <!-- Weather placeholder (wired up in Phase 5) -->
+    <div id="weather" class="hidden"></div>
+  </div>
+
+  <!-- Alarm overlay — hidden until alarm fires -->
+  <div id="alarm-overlay" class="hidden">
+    <div id="alarm-label"></div>
+    <div id="alarm-time-display"></div>
+    <div class="alarm-buttons">
+      <button id="btn-snooze" onclick="sendSnooze()">Snooze</button>
+      <button id="btn-dismiss" onclick="sendDismiss()">Dismiss</button>
+    </div>
+  </div>
+
+  <!-- Connection status indicator -->
+  <div id="ws-status" title="WebSocket status"></div>
+
+  <script src="js/clock.js"></script>
+  <script src="js/alarm.js"></script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+/* ------------------------------------------------------------------ */
+/* Reset & base                                                         */
+/* ------------------------------------------------------------------ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --brightness: 100%;
+  --accent: #e8a020;
+  --bg: #0a0a0a;
+  --text: #f0f0f0;
+  --dim: #888;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Orbitron', monospace;
+  filter: brightness(var(--brightness));
+  user-select: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Clock face                                                           */
+/* ------------------------------------------------------------------ */
+#clock-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 12px;
+}
+
+#time {
+  font-size: clamp(3rem, 12vw, 7rem);
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 20px rgba(232, 160, 32, 0.5);
+}
+
+#date {
+  font-size: clamp(1rem, 3vw, 1.8rem);
+  color: var(--dim);
+}
+
+#day {
+  font-size: clamp(0.9rem, 2.5vw, 1.4rem);
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+#next-alarm {
+  margin-top: 8px;
+  font-size: clamp(0.75rem, 2vw, 1rem);
+  color: #555;
+}
+
+/* ------------------------------------------------------------------ */
+/* Alarm overlay                                                        */
+/* ------------------------------------------------------------------ */
+#alarm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 100;
+}
+
+#alarm-overlay.hidden { display: none; }
+
+#alarm-label {
+  font-size: clamp(1.2rem, 4vw, 2.5rem);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+#alarm-time-display {
+  font-size: clamp(2.5rem, 10vw, 5rem);
+  font-weight: 700;
+  color: var(--text);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+#alarm-overlay.firing #alarm-label {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.alarm-buttons {
+  display: flex;
+  gap: 24px;
+  margin-top: 12px;
+}
+
+.alarm-buttons button {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(1rem, 3vw, 1.4rem);
+  padding: 16px 40px;
+  border: 2px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: background 0.2s, color 0.2s;
+}
+
+.alarm-buttons button:active,
+.alarm-buttons button:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* ------------------------------------------------------------------ */
+/* WebSocket status dot                                                 */
+/* ------------------------------------------------------------------ */
+#ws-status {
+  position: fixed;
+  bottom: 10px;
+  right: 12px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #333;
+  transition: background 0.5s;
+}
+
+#ws-status.connected    { background: #2a2; }
+#ws-status.disconnected { background: #a22; }
+
+/* ------------------------------------------------------------------ */
+/* Utility                                                              */
+/* ------------------------------------------------------------------ */
+.hidden { display: none !important; }

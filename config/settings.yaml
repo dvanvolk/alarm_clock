@@ -1,0 +1,55 @@
+clock:
+  timezone: "America/New_York"
+  display_format: "12hr"   # 12hr or 24hr
+  show_seconds: true
+
+display:
+  auto_dim: true
+  dim_min_brightness: 10   # % brightness floor at night
+  dim_max_brightness: 100  # % brightness ceiling in daylight
+  dim_low_lux: 20          # lux threshold to start dimming
+  dim_high_lux: 300        # lux threshold for full brightness
+
+alarms:
+  - label: "Weekdays"
+    time: "06:30"
+    days: [mon, tue, wed, thu, fri]
+    enabled: true
+    sound: music_assistant
+    music_uri: "media-source://music_assistant/playlist/morning"
+  - label: "Weekends"
+    time: "08:00"
+    days: [sat, sun]
+    enabled: true
+    sound: music_assistant
+    music_uri: "media-source://music_assistant/playlist/morning"
+
+audio:
+  volume_start: 20         # % volume when alarm starts
+  volume_max: 80           # % volume ceiling
+  volume_ramp_seconds: 120 # seconds to ramp from start to max
+  fallback_buzzer: true    # use buzzer if Music Assistant unavailable
+
+snooze:
+  duration_minutes: 9
+
+sunrise:
+  enabled: true
+  ramp_minutes: 20         # how long before alarm to start
+  max_brightness: 255
+
+weather:
+  enabled: false
+  ha_temp_entity: "sensor.outdoor_temperature"
+  ha_condition_entity: "weather.home"
+  refresh_interval_seconds: 300
+
+home_assistant:
+  url: "http://homeassistant.local:8123"
+  token: ""                # Long-lived access token
+  mqtt_broker: "homeassistant.local"
+  mqtt_port: 1883
+
+ota:
+  git_branch: "main"
+  auto_check: false
