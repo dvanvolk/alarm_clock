@@ -219,8 +219,10 @@ IDLE → SUNRISE (if enabled, ramp_minutes before alarm time)
 | `rpi_ws281x` | WS2812B LED strip control |
 | `pyyaml` | Load and save YAML config file |
 | `paho-mqtt` | MQTT client for HA Discovery and messaging |
+| `aiohttp` | Async HTTP client for HA REST API calls |
 | `python-dateutil` | Timezone and DST handling |
 | `asyncio` | Async task management across all subsystems |
+| `alsaaudio` | Optional — HiFiBerry DAC+ Pro volume control via ALSA |
 
 ---
 
@@ -265,23 +267,47 @@ alarm-clock/
 | Snooze Button | GPIO | GPIO17 (pull-up, active low) |
 | Buzzer | GPIO PWM | GPIO18 (hardware PWM) |
 | WS2812B LED Strip | GPIO PWM | GPIO12 (PWM0, requires root) |
+| HiFiBerry DAC+ Pro | I2S | GPIO18–21 (I2S bus) — RCA output to powered speakers |
 | RPi Touchscreen | DSI | DSI connector |
+
+### HiFiBerry DAC+ Pro setup
+Add to `/boot/config.txt`:
+```
+dtoverlay=hifiberry-dacplus
+```
+Volume is controlled via ALSA — use `amixer` / `alsamixer` from the command line, or the `alsaaudio` Python library from backend code.
 
 ---
 
 ## Suggested Build Order
 
-| Phase | Description |
-|---|---|
-| 1 | Python backend skeleton — FastAPI, WebSocket, config loading |
-| 2 | Clock face UI — time display, WebSocket client, basic styling |
-| 3 | Hardware layer — RTC, light sensor, GPIO snooze button, buzzer |
-| 4 | Alarm logic — scheduling, firing, snooze, Music Assistant trigger |
-| 5 | Home Assistant integration — MQTT discovery, weather polling |
-| 6 | Sunrise LED effect |
-| 7 | Settings UI — form, save back to YAML |
-| 8 | HA dashboard idle/embed screen |
-| 9 | OTA update mechanism |
+| Phase | Description | Status |
+|---|---|---|
+| 1 | Python backend skeleton — FastAPI, WebSocket, config loading | Built — in testing |
+| 2 | Clock face UI — time display, WebSocket client, basic styling | Built — in testing |
+| 3 | Hardware layer — RTC, light sensor, GPIO snooze button, buzzer | Built — in testing |
+| 4 | Alarm logic — scheduling, firing, snooze, Music Assistant trigger | Built — in testing |
+| 5 | Home Assistant integration — MQTT discovery, weather polling | Not started |
+| 6 | Sunrise LED effect | Not started |
+| 7 | Settings UI — form, save back to YAML | Not started |
+| 8 | HA dashboard idle/embed screen | Not started |
+| 9 | OTA update mechanism | Not started |
+| 10 | Voice control — Wyoming satellite, USB mic, local STT/TTS | Future phase |
+
+---
+
+## Phase 10 — Voice Control (Future)
+
+### Planned approach
+- USB microphone — avoids GPIO HAT conflict with the HiFiBerry DAC+ Pro
+- Wyoming satellite protocol for integration with Home Assistant
+- Wake word detection: `openWakeWord` running locally on the Pi
+- Speech-to-text: `faster-whisper` (local, no cloud dependency)
+- Intent handling: Home Assistant local intents
+- Text-to-speech: `Piper` (local; audio output via DAC+ Pro / ALSA)
+- Supported commands: set alarm, snooze, dismiss, weather query
+
+**No action needed until Phase 5 HA integration is complete.**
 
 ---
 
@@ -347,4 +373,4 @@ ota:
 
 ---
 
-*Document version: 1.1 — June 2026*
+*Document version: 1.2 — June 2026*

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-This project is in the planning/design phase. The `docs/` folder contains the requirements and architecture documents. No code exists yet. See `docs/alarm_clock_architecture.md` for the recommended build order (Phases 1–9).
+Phases 1–4 are built and in testing. Phases 5–9 are not started. Phase 10 (voice control) is a future phase. See `docs/alarm_clock_architecture.md` for the full build order and phase details.
 
 ## Architecture
 
@@ -43,7 +43,7 @@ alarm-clock/
 
 ## Runtime Environment
 
-- **Target hardware:** Raspberry Pi 3, Raspberry Pi OS Lite, Openbox for kiosk windowing
+- **Target hardware:** Raspberry Pi 3, Raspberry Pi OS Lite, Openbox for kiosk windowing; HiFiBerry DAC+ Pro for audio output (RCA → powered speakers, volume via ALSA)
 - **Python:** 3.11+; backend runs as a systemd service
 - **Frontend:** served by FastAPI's static file hosting, opened by Chromium in kiosk mode
 
@@ -54,6 +54,7 @@ alarm-clock/
 - `RPi.GPIO` and I2C libraries (`smbus2`, Adafruit CircuitPython) are hardware-specific — mock or skip on non-Pi dev machines.
 - The DS3231 RTC is a fallback time source only; `chrony` syncs NTP → system clock → DS3231.
 - Home Assistant integration uses both MQTT Discovery (device registration) and the HA WebSocket API (weather entity polling, Music Assistant service calls).
+- HiFiBerry DAC+ Pro volume is controlled via ALSA — use `subprocess` to call `amixer` or use the `alsaaudio` Python library. Do not use `RPi.GPIO` for volume.
 - YAML config (`config/settings.yaml`) is the single source of truth for all user settings. The settings UI writes back to it.
 
 ## Commands (once code exists)
@@ -70,5 +71,5 @@ sudo journalctl -u alarm-clock -f
 # Install Python dependencies
 pip install fastapi uvicorn websockets RPi.GPIO smbus2 \
   adafruit-circuitpython-ds3231 adafruit-circuitpython-bh1750 \
-  rpi-ws281x pyyaml paho-mqtt python-dateutil
+  rpi-ws281x pyyaml paho-mqtt aiohttp python-dateutil alsaaudio
 ```

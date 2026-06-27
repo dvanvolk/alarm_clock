@@ -3,11 +3,12 @@
 ## Hardware Platform
 - **Raspberry Pi 3** with official **Raspberry Pi touchscreen**
 - Can double as a **Home Assistant dashboard** when alarm UI is idle
-- **RTC module** (e.g., DS3231) for timekeeping during power/internet outage
-- **Light sensor** (e.g., BH1750 or LDR) for automatic display dimming
-- **Physical snooze button** (GPIO)
-- **Passive/active buzzer** on GPIO as backup alarm sound
-- **Optional:** LED strip (WS2812B) for sunrise effect
+- **HiFiBerry DAC+ Pro** — I2S DAC with RCA output to powered speakers; hardware volume via ALSA
+- **RTC module** (DS3231) for timekeeping during power/internet outage
+- **Light sensor** (BH1750) for automatic display dimming
+- **Physical snooze button** (GPIO17)
+- **Active buzzer** on GPIO18 as backup alarm sound
+- **LED strip** (WS2812B on GPIO12) for sunrise effect
 
 ---
 
@@ -132,6 +133,17 @@ All of the following are **software-configurable** (via UI or config file):
 
 ---
 
+## Voice Control *(Future Phase)*
+- **USB microphone** (avoids GPIO HAT conflict with the HiFiBerry DAC+ Pro)
+- **Wyoming satellite** protocol — integrates with Home Assistant voice pipeline
+- **Wake word**: `openWakeWord` running locally
+- **Speech-to-text**: `faster-whisper` (fully local, no cloud)
+- **Intent handling**: Home Assistant local intents
+- **Text-to-speech**: `Piper` (local; output via DAC+ Pro)
+- Supported voice commands: set alarm, snooze, dismiss, weather query
+
+---
+
 ## Nice to Have Summary
 
 | Feature | Priority |
@@ -141,7 +153,8 @@ All of the following are **software-configurable** (via UI or config file):
 | HA dashboard idle screen | Nice to have |
 | Music Assistant audio | Nice to have |
 | Individual day alarm scheduling | Nice to have |
+| Voice control (Wyoming satellite + local STT/TTS) | Future phase |
 
 ---
 
-*Document version: 1.1 — June 2026*
+*Document version: 1.2 — June 2026*
