@@ -141,7 +141,11 @@ app = FastAPI(lifespan=lifespan)
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await manager.connect(ws)
-    # Send current alarm state immediately on connect
+    clock_cfg = config.get("clock", {})
+    await ws.send_text(json.dumps({
+        "type": "settings_update",
+        "seconds_scale": clock_cfg.get("seconds_scale", 0.55),
+    }))
     if scheduler:
         await ws.send_text(json.dumps(scheduler.state_message()))
     try:

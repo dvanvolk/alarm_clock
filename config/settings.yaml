@@ -2,6 +2,7 @@ clock:
   timezone: "America/New_York"
   display_format: "12hr"   # 12hr or 24hr
   show_seconds: true
+  seconds_scale: 0.55       # seconds font size relative to main time (0.0–1.0)
 
 display:
   auto_dim: true

@@ -41,6 +41,11 @@ html, body {
   text-shadow: 0 0 20px rgba(232, 160, 32, 0.5);
 }
 
+#time .seconds {
+  font-size: calc(1em * var(--seconds-scale, 0.55));
+  vertical-align: middle;
+}
+
 #date {
   font-size: clamp(1rem, 3vw, 1.8rem);
   color: var(--dim);

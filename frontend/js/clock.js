@@ -26,10 +26,28 @@ function connect() {
   });
 }
 
+function renderTime(time) {
+  const el = document.getElementById("time");
+  // Split "H:MM:SS AM" → main "H:MM" + seconds ":SS" + suffix " AM"
+  const match = time.match(/^(.+):(\d{2})(\s*[AP]M)?$/);
+  if (match) {
+    const [, main, sec, suffix] = match;
+    el.innerHTML = `${main}<span class="seconds">:${sec}${suffix || ""}</span>`;
+  } else {
+    el.textContent = time;
+  }
+}
+
 function dispatch(msg) {
   switch (msg.type) {
+    case "settings_update":
+      document.documentElement.style.setProperty(
+        "--seconds-scale", msg.seconds_scale ?? 0.55
+      );
+      break;
+
     case "time_update":
-      document.getElementById("time").textContent = msg.time;
+      renderTime(msg.time);
       document.getElementById("date").textContent = msg.date;
       document.getElementById("day").textContent  = msg.day;
       break;
