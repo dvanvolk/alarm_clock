@@ -4,6 +4,7 @@ uvicorn[standard]
 pyyaml
 python-dateutil
 websockets
+paho-mqtt
 
 # Pi-only — install manually on device:
 # RPi.GPIO
@@ -11,4 +12,3 @@ websockets
 # adafruit-circuitpython-ds3231
 # adafruit-circuitpython-bh1750
 # rpi-ws281x
-# paho-mqtt

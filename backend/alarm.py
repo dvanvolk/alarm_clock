@@ -3,9 +3,12 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum, auto
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import backend.hardware as hw
+
+if TYPE_CHECKING:
+    from backend.ha_client import HAClient
 
 log = logging.getLogger(__name__)
 
@@ -55,6 +58,7 @@ def _parse_alarms(config: dict) -> list[Alarm]:
 class AlarmScheduler:
     def __init__(self, config: dict, manager):
         self._manager = manager
+        self._ha: Optional["HAClient"] = None
         self._alarms: list[Alarm] = []
         self._state = AlarmState.IDLE
         self._active: Optional[Alarm] = None
@@ -65,6 +69,9 @@ class AlarmScheduler:
         self._audio_cfg: dict = {}
         self.reload(config)
 
+    def set_ha_client(self, ha: "HAClient") -> None:
+        self._ha = ha
+
     # ------------------------------------------------------------------
     # Config
     # ------------------------------------------------------------------
@@ -73,6 +80,7 @@ class AlarmScheduler:
         self._alarms = _parse_alarms(config)
         self._snooze_minutes = config.get("snooze", {}).get("duration_minutes", 9)
         self._audio_cfg = config.get("audio", {})
+        self._publish_ha_state()
 
     # ------------------------------------------------------------------
     # Tick — called every 30 s from main
@@ -104,17 +112,25 @@ class AlarmScheduler:
             "label": alarm.label,
             "time": alarm.time,
         })
+        self._publish_ha_state()
 
         # Start sound
-        if alarm.sound == "music_assistant":
-            await _trigger_music(alarm.music_uri, self._audio_cfg)
+        if alarm.sound == "music_assistant" and self._ha:
+            await self._ha.trigger_music(alarm.music_uri, self._audio_cfg)
+        elif alarm.sound == "music_assistant":
+            log.info("[NO HA] Would play Music Assistant: %s", alarm.music_uri)
         else:
             self._buzz_task = asyncio.create_task(_buzz_loop())
 
-        # Volume ramp (stub on Windows; real audio in Phase 5)
-        self._volume_task = asyncio.create_task(
-            _volume_ramp(self._audio_cfg)
-        )
+        # Volume ramp — real via HA, stub fallback without it
+        if self._ha:
+            self._volume_task = asyncio.create_task(
+                self._ha.volume_ramp(self._audio_cfg)
+            )
+        else:
+            self._volume_task = asyncio.create_task(
+                _volume_ramp(self._audio_cfg)
+            )
 
     # ------------------------------------------------------------------
     # Snooze / Dismiss
@@ -125,21 +141,27 @@ class AlarmScheduler:
             return
         self._cancel_tasks()
         hw.stop_buzz()
+        if self._ha:
+            await self._ha.stop_music()
         self._snooze_until = datetime.now() + timedelta(minutes=self._snooze_minutes)
         self._state = AlarmState.SNOOZED
         log.info("Snoozed until %s", self._snooze_until.strftime("%H:%M"))
         await self._manager.broadcast({"type": "alarm_snoozed", "until": self._snooze_until.strftime("%H:%M")})
+        self._publish_ha_state()
 
     async def dismiss(self) -> None:
         if self._state == AlarmState.IDLE:
             return
         self._cancel_tasks()
         hw.stop_buzz()
+        if self._ha:
+            await self._ha.stop_music()
         self._state = AlarmState.IDLE
         self._active = None
         self._snooze_until = None
         log.info("Alarm dismissed")
         await self._manager.broadcast({"type": "alarm_dismissed"})
+        self._publish_ha_state()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -151,6 +173,22 @@ class AlarmScheduler:
                 task.cancel()
         self._volume_task = None
         self._buzz_task = None
+
+    def _publish_ha_state(self) -> None:
+        if not self._ha:
+            return
+        next_alarm = self.next_alarm()
+        next_label = next_alarm.label if next_alarm else "No alarm set"
+        is_firing = self._state == AlarmState.FIRING
+        weekday_on = any(
+            a.enabled for a in self._alarms
+            if any(d in {"mon", "tue", "wed", "thu", "fri"} for d in a.days)
+        )
+        weekend_on = any(
+            a.enabled for a in self._alarms
+            if any(d in {"sat", "sun"} for d in a.days)
+        )
+        self._ha.publish_alarm_state(next_label, is_firing, weekday_on, weekend_on)
 
     def state_message(self) -> dict:
         next_alarm = self.next_alarm()

@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.config import load_config, save_config
 from backend.alarm import AlarmScheduler
+from backend.ha_client import HAClient
 import backend.hardware as hw
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -19,6 +20,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 config: dict = {}
 scheduler: AlarmScheduler | None = None
+ha_client: HAClient | None = None
 
 
 class ConnectionManager:
@@ -110,7 +112,7 @@ async def alarm_check_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global config, scheduler
+    global config, scheduler, ha_client
     config = load_config()
     hw.setup_hardware(config)
 
@@ -121,9 +123,26 @@ async def lifespan(app: FastAPI):
 
     hw.setup_snooze_button(snooze_button_pressed)
 
+    ha_client = HAClient(config, manager)
+
+    async def on_alarm_switch(switch_name: str, enabled: bool) -> None:
+        for alarm in config.get("alarms", []):
+            days = set(alarm.get("days", []))
+            if switch_name == "weekday" and days & {"mon", "tue", "wed", "thu", "fri"}:
+                alarm["enabled"] = enabled
+            elif switch_name == "weekend" and days & {"sat", "sun"}:
+                alarm["enabled"] = enabled
+        save_config(config)
+        scheduler.reload(config)
+        log.info("HA switch: %s alarms → %s", switch_name, "enabled" if enabled else "disabled")
+
+    ha_client.set_switch_callback(on_alarm_switch)
+    scheduler.set_ha_client(ha_client)
+
     asyncio.create_task(tick_loop())
     asyncio.create_task(hardware_poll_loop())
     asyncio.create_task(alarm_check_loop())
+    await ha_client.start()
 
     log.info("Alarm clock backend started")
     yield

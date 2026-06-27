@@ -47,9 +47,10 @@ weather:
 
 home_assistant:
   url: "http://homeassistant.local:8123"
-  token: ""                # Long-lived access token
+  token: ""                    # Long-lived access token
   mqtt_broker: "homeassistant.local"
   mqtt_port: 1883
+  music_player_entity: ""      # e.g. "media_player.alarm_clock"
 
 ota:
   git_branch: "main"
