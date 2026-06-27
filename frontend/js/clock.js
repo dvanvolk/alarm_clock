@@ -40,6 +40,10 @@ function renderTime(time) {
 
 function dispatch(msg) {
   switch (msg.type) {
+    case "weather_update":
+      handleWeatherUpdate(msg);
+      break;
+
     case "settings_update":
       document.documentElement.style.setProperty(
         "--seconds-scale", msg.seconds_scale ?? 0.55

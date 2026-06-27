@@ -52,6 +52,9 @@ class HAClient:
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._command_queue: asyncio.Queue = asyncio.Queue()
 
+        # Last known weather — sent to new clients on connect
+        self._last_weather: Optional[dict] = None
+
         # HA WebSocket
         self._ha_ws = None
         self._ha_ws_connected = False
@@ -223,13 +226,21 @@ class HAClient:
     # Weather polling (HA REST via urllib — no aiohttp dependency)
     # ------------------------------------------------------------------
 
+    @property
+    def last_weather(self) -> Optional[dict]:
+        return self._last_weather
+
     async def _weather_poll_task(self) -> None:
         interval = int(self._weather_cfg.get("refresh_interval_seconds", 300))
         while True:
             try:
                 update = await asyncio.to_thread(self._fetch_weather_sync)
                 if update:
+                    self._last_weather = update
                     await self._ws_manager.broadcast(update)
+                    log.info("Weather updated: %s %s° H:%s L:%s",
+                             update.get("condition"), update.get("temp"),
+                             update.get("high"), update.get("low"))
             except Exception as e:
                 log.warning("Weather poll error: %s", e)
             await asyncio.sleep(interval)
@@ -238,8 +249,8 @@ class HAClient:
         """Blocking HA REST calls — runs in thread pool via asyncio.to_thread."""
         base_url = self._ha_cfg.get("url", "").rstrip("/")
         token = self._ha_cfg.get("token", "")
-        temp_entity = self._weather_cfg.get("ha_temp_entity", "sensor.outdoor_temperature")
-        cond_entity = self._weather_cfg.get("ha_condition_entity", "weather.home")
+        cond_entity = self._weather_cfg.get("ha_condition_entity", "weather.forecast_home")
+        temp_entity = self._weather_cfg.get("ha_temp_entity", "").strip()
 
         headers = {
             "Authorization": f"Bearer {token}",
@@ -254,23 +265,55 @@ class HAClient:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 return json.loads(resp.read())
 
+        def call_service(domain: str, service: str, data: dict) -> dict:
+            """POST to /api/services with return_response — supported in HA 2024.4+."""
+            body = json.dumps(data).encode()
+            req = urllib.request.Request(
+                f"{base_url}/api/services/{domain}/{service}?return_response",
+                data=body,
+                headers=headers,
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return json.loads(resp.read())
+
         update: dict = {"type": "weather_update"}
 
-        try:
-            state = get_state(temp_entity)
-            update["temp"] = state.get("state")
-        except Exception as e:
-            log.warning("HA: could not fetch %s: %s", temp_entity, e)
-
+        # Fetch condition entity — also provides current temp via attributes.temperature
         try:
             state = get_state(cond_entity)
             update["condition"] = state.get("state")
-            forecast = state.get("attributes", {}).get("forecast", [])
-            if forecast:
-                update["high"] = forecast[0].get("temperature")
-                update["low"] = forecast[0].get("templow")
+            attrs = state.get("attributes", {})
+            # Use the weather entity's built-in temperature when no separate sensor
+            if not temp_entity:
+                temp = attrs.get("temperature")
+                if temp is not None:
+                    update["temp"] = str(temp)
         except Exception as e:
             log.warning("HA: could not fetch %s: %s", cond_entity, e)
+
+        # Fetch dedicated temperature sensor if configured
+        if temp_entity:
+            try:
+                state = get_state(temp_entity)
+                update["temp"] = state.get("state")
+            except Exception as e:
+                log.warning("HA: could not fetch %s: %s", temp_entity, e)
+
+        # Fetch today's forecast high/low via service call (HA 2024.4+ API)
+        try:
+            result = call_service("weather", "get_forecasts", {
+                "entity_id": cond_entity,
+                "type": "daily",
+            })
+            # HA wraps the response in service_response; fall back to root for older versions
+            payload = result.get("service_response", result)
+            forecasts = payload.get(cond_entity, {}).get("forecast", [])
+            if forecasts:
+                update["high"] = forecasts[0].get("temperature")
+                update["low"] = forecasts[0].get("templow")
+        except Exception as e:
+            log.debug("HA: forecast fetch skipped: %s", e)
 
         return update if ("temp" in update or "condition" in update) else None
 

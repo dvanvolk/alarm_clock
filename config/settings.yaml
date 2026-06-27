@@ -40,9 +40,9 @@ sunrise:
   max_brightness: 255
 
 weather:
-  enabled: false
-  ha_temp_entity: "sensor.outdoor_temperature"
-  ha_condition_entity: "weather.home"
+  enabled: true
+  ha_condition_entity: "weather.forecast_home"
+  ha_temp_entity: ""           # leave blank to use temperature from the weather entity
   refresh_interval_seconds: 300
 
 home_assistant:

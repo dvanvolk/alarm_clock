@@ -15,8 +15,13 @@
     <div id="day"></div>
     <div id="next-alarm"></div>
 
-    <!-- Weather placeholder (wired up in Phase 5) -->
-    <div id="weather" class="hidden"></div>
+    <div id="weather" class="hidden">
+      <span id="weather-condition"></span>
+      <span class="weather-sep">·</span>
+      <span id="weather-temp"></span>
+      <span class="weather-sep">·</span>
+      <span id="weather-high-low"></span>
+    </div>
   </div>
 
   <!-- Alarm overlay — hidden until alarm fires -->
@@ -32,6 +37,7 @@
   <!-- Connection status indicator -->
   <div id="ws-status" title="WebSocket status"></div>
 
+  <script src="js/weather.js"></script>
   <script src="js/clock.js"></script>
   <script src="js/alarm.js"></script>
 </body>

@@ -58,6 +58,18 @@ html, body {
   letter-spacing: 0.15em;
 }
 
+#weather {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: clamp(0.9rem, 2.5vw, 1.3rem);
+  color: var(--dim);
+}
+
+.weather-sep {
+  color: #444;
+}
+
 #next-alarm {
   margin-top: 8px;
   font-size: clamp(0.75rem, 2vw, 1rem);

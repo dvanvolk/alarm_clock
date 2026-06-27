@@ -167,6 +167,8 @@ async def websocket_endpoint(ws: WebSocket):
     }))
     if scheduler:
         await ws.send_text(json.dumps(scheduler.state_message()))
+    if ha_client and ha_client.last_weather:
+        await ws.send_text(json.dumps(ha_client.last_weather))
     try:
         while True:
             raw = await ws.receive_text()
