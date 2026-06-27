@@ -1,11 +1,22 @@
 import os
 import tempfile
+
 import yaml
+from dotenv import load_dotenv
+
+load_dotenv()  # loads .env into os.environ (no-op if file absent)
 
 
 def load_config(path: str = "config/settings.yaml") -> dict:
     with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        cfg = yaml.safe_load(f)
+
+    # Overlay secrets from environment — env vars win over YAML values.
+    ha_token = os.environ.get("HA_TOKEN", "").strip()
+    if ha_token:
+        cfg.setdefault("home_assistant", {})["token"] = ha_token
+
+    return cfg
 
 
 def save_config(data: dict, path: str = "config/settings.yaml") -> None:
