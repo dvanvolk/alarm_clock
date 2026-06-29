@@ -12,9 +12,18 @@ def load_config(path: str = "config/settings.yaml") -> dict:
         cfg = yaml.safe_load(f)
 
     # Overlay secrets from environment — env vars win over YAML values.
+    ha = cfg.setdefault("home_assistant", {})
+
     ha_token = os.environ.get("HA_TOKEN", "").strip()
     if ha_token:
-        cfg.setdefault("home_assistant", {})["token"] = ha_token
+        ha["token"] = ha_token
+
+    mqtt_user = os.environ.get("MQTT_USER", "").strip()
+    mqtt_pass = os.environ.get("MQTT_PASS", "").strip()
+    if mqtt_user:
+        ha["mqtt_user"] = mqtt_user
+    if mqtt_pass:
+        ha["mqtt_pass"] = mqtt_pass
 
     return cfg
 

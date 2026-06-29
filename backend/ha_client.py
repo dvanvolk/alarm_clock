@@ -99,6 +99,11 @@ class HAClient:
 
         client = _mqtt_lib.Client(client_id=_NODE_ID)
 
+        mqtt_user = self._ha_cfg.get("mqtt_user", "")
+        mqtt_pass = self._ha_cfg.get("mqtt_pass", "")
+        if mqtt_user:
+            client.username_pw_set(mqtt_user, mqtt_pass or None)
+
         def on_connect(c, userdata, flags, rc):
             if rc != 0:
                 log.warning("MQTT connect failed rc=%d", rc)
