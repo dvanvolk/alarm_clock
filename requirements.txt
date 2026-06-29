@@ -5,6 +5,7 @@ pyyaml
 python-dateutil
 websockets
 paho-mqtt
+python-dotenv
 
 # Pi-only — install manually on device:
 # RPi.GPIO
