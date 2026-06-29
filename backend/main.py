@@ -11,6 +11,7 @@ from backend.config import load_config, save_config
 from backend.alarm import AlarmScheduler
 from backend.ha_client import HAClient
 import backend.hardware as hw
+import backend.leds as leds
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -115,6 +116,11 @@ async def lifespan(app: FastAPI):
     global config, scheduler, ha_client
     config = load_config()
     hw.setup_hardware(config)
+    sunrise_cfg = config.get("sunrise", {})
+    leds.setup_leds(
+        sunrise_cfg.get("num_leds", 6),
+        sunrise_cfg.get("max_brightness", 255),
+    )
 
     scheduler = AlarmScheduler(config, manager)
 
