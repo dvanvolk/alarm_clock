@@ -30,17 +30,20 @@ if IS_PI:
     import busio
     import adafruit_ds3231
     import adafruit_bh1750
+    import adafruit_dht
 
     _i2c = None
     _rtc = None
     _light = None
     _buzzer_pwm = None
+    _dht = None
 else:
     GPIO = None
     _i2c = None
     _rtc = None
     _light = None
     _buzzer_pwm = None
+    _dht = None
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -61,6 +64,42 @@ def setup_hardware(config: dict) -> None:
     _rtc = adafruit_ds3231.DS3231(_i2c)
     _light = adafruit_bh1750.BH1750(_i2c)
     log.info("Hardware initialised (GPIO, I2C, RTC, light sensor)")
+
+
+def setup_dht22(gpio_pin: int) -> None:
+    """Initialise the DHT22 sensor on the given BCM GPIO pin."""
+    global _dht
+    if not IS_PI:
+        log.info("[STUB] DHT22 setup skipped (not on Pi), pin GPIO%d", gpio_pin)
+        return
+    board_pin = getattr(board, f"D{gpio_pin}", None)
+    if board_pin is None:
+        log.error("DHT22: invalid GPIO pin %d", gpio_pin)
+        return
+    _dht = adafruit_dht.DHT22(board_pin)
+    log.info("DHT22 ready on GPIO%d", gpio_pin)
+
+
+def read_dht22(unit: str = "F") -> tuple[float | None, float | None]:
+    """
+    Read temperature and humidity from the DHT22.
+    Returns (temp, humidity) — either may be None on a read error.
+    Temperature is in °F by default; pass unit="C" for Celsius.
+    """
+    if not IS_PI or _dht is None:
+        # Stub: return plausible indoor values
+        return (72.0, 45.0) if unit == "F" else (22.2, 45.0)
+    try:
+        temp_c = _dht.temperature
+        humidity = _dht.humidity
+        if temp_c is None or humidity is None:
+            return None, None
+        temp = temp_c * 9 / 5 + 32 if unit == "F" else temp_c
+        return round(temp, 1), round(humidity, 1)
+    except RuntimeError as e:
+        # DHT22 occasionally fails a read — not an error worth logging loudly
+        log.debug("DHT22 read error (transient): %s", e)
+        return None, None
 
 
 def cleanup() -> None:

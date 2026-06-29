@@ -107,6 +107,20 @@ async def alarm_check_loop():
         await asyncio.sleep(30)
 
 
+async def dht22_poll_loop():
+    """Read DHT22 and publish to HA MQTT on each interval."""
+    dht_cfg = config.get("dht22", {})
+    interval = int(dht_cfg.get("poll_interval_seconds", 60))
+    unit = dht_cfg.get("temperature_unit", "F")
+    while True:
+        temp, humidity = hw.read_dht22(unit)
+        if temp is not None and humidity is not None:
+            log.info("DHT22: %.1f°%s  %.1f%%RH", temp, unit, humidity)
+            if ha_client:
+                ha_client.publish_dht22(temp, humidity)
+        await asyncio.sleep(interval)
+
+
 # ---------------------------------------------------------------------------
 # Lifespan — startup / shutdown
 # ---------------------------------------------------------------------------
@@ -149,6 +163,11 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(hardware_poll_loop())
     asyncio.create_task(alarm_check_loop())
     await ha_client.start()
+
+    dht_cfg = config.get("dht22", {})
+    if dht_cfg.get("enabled"):
+        hw.setup_dht22(int(dht_cfg.get("gpio_pin", 4)))
+        asyncio.create_task(dht22_poll_loop())
 
     log.info("Alarm clock backend started")
     yield

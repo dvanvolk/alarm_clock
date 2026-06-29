@@ -216,6 +216,7 @@ IDLE → SUNRISE (if enabled, ramp_minutes before alarm time)
 | `smbus2` | I2C communication — DS3231, BH1750 |
 | `adafruit-circuitpython-ds3231` | RTC read/write |
 | `adafruit-circuitpython-bh1750` | Light sensor readings |
+| `adafruit-circuitpython-dht` | DHT22 temperature and humidity |
 | `rpi_ws281x` | WS2812B LED strip control |
 | `pyyaml` | Load and save YAML config file |
 | `paho-mqtt` | MQTT client for HA Discovery and messaging |
@@ -264,6 +265,7 @@ alarm-clock/
 |---|---|---|
 | DS3231 RTC | I2C | SDA (GPIO2), SCL (GPIO3) |
 | BH1750 Light Sensor | I2C | SDA (GPIO2), SCL (GPIO3) |
+| DHT22 Temp/Humidity | GPIO (1-wire) | GPIO4 (configurable) |
 | Snooze Button | GPIO | GPIO17 (pull-up, active low) |
 | Buzzer | GPIO PWM | GPIO18 (hardware PWM) |
 | WS2812B LED Strip | GPIO PWM | GPIO12 (PWM0, requires root) |

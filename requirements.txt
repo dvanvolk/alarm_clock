@@ -11,4 +11,5 @@ paho-mqtt
 # smbus2
 # adafruit-circuitpython-ds3231
 # adafruit-circuitpython-bh1750
+# adafruit-circuitpython-dht
 # rpi-ws281x

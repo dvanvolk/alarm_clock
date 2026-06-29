@@ -42,6 +42,12 @@ sunrise:
   max_brightness: 255
   num_leds: 6              # number of WS2812B LEDs in the strip
 
+dht22:
+  enabled: true
+  gpio_pin: 4              # BCM GPIO pin the DHT22 data line is connected to
+  poll_interval_seconds: 60
+  temperature_unit: "F"    # F or C
+
 weather:
   enabled: true
   ha_condition_entity: "weather.forecast_home"

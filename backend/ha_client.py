@@ -186,6 +186,24 @@ class HAClient:
             "device_class": "sound",
             "device": device,
         })
+        pub("sensor", "temperature", {
+            "name": "Alarm Clock Temperature",
+            "unique_id": f"{_NODE_ID}_temperature",
+            "state_topic": f"{_NODE_ID}/sensor/temperature/state",
+            "device_class": "temperature",
+            "unit_of_measurement": "°F",
+            "suggested_display_precision": 1,
+            "device": device,
+        })
+        pub("sensor", "humidity", {
+            "name": "Alarm Clock Humidity",
+            "unique_id": f"{_NODE_ID}_humidity",
+            "state_topic": f"{_NODE_ID}/sensor/humidity/state",
+            "device_class": "humidity",
+            "unit_of_measurement": "%",
+            "suggested_display_precision": 1,
+            "device": device,
+        })
 
     async def _handle_switch_command(self, topic: str, payload: str) -> None:
         # topic: alarm_clock/switch/<name>/command
@@ -200,6 +218,13 @@ class HAClient:
                 await self._switch_callback(switch_name, enabled)
             else:
                 self._switch_callback(switch_name, enabled)
+
+    def publish_dht22(self, temp: float, humidity: float) -> None:
+        """Publish DHT22 temperature and humidity to MQTT."""
+        if not (self._mqtt_connected and self._mqtt):
+            return
+        self._mqtt.publish(f"{_NODE_ID}/sensor/temperature/state", temp, retain=True)
+        self._mqtt.publish(f"{_NODE_ID}/sensor/humidity/state", humidity, retain=True)
 
     def publish_alarm_state(
         self,
