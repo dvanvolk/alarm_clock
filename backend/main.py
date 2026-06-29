@@ -164,6 +164,8 @@ async def websocket_endpoint(ws: WebSocket):
     await ws.send_text(json.dumps({
         "type": "settings_update",
         "seconds_scale": clock_cfg.get("seconds_scale", 0.55),
+        "font": clock_cfg.get("font", "Orbitron"),
+        "accent_color": clock_cfg.get("accent_color", "#e8a020"),
     }))
     if scheduler:
         await ws.send_text(json.dumps(scheduler.state_message()))

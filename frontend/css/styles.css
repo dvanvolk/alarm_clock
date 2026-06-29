@@ -9,6 +9,7 @@
   --bg: #0a0a0a;
   --text: #f0f0f0;
   --dim: #888;
+  --clock-font: 'Orbitron', monospace;
 }
 
 html, body {
@@ -16,7 +17,7 @@ html, body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Orbitron', monospace;
+  font-family: var(--clock-font);
   filter: brightness(var(--brightness));
   user-select: none;
 }

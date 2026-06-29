@@ -3,6 +3,8 @@ clock:
   display_format: "12hr"   # 12hr or 24hr
   show_seconds: true
   seconds_scale: 0.55       # seconds font size relative to main time (0.0–1.0)
+  font: "Exo 2"          # Orbitron | Share Tech Mono | Rajdhani | Exo 2 | Michroma | Audiowide
+  accent_color: "#e8a020"   # any CSS color — applies to time digits and highlights
 
 display:
   auto_dim: true

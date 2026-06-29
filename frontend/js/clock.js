@@ -45,9 +45,13 @@ function dispatch(msg) {
       break;
 
     case "settings_update":
-      document.documentElement.style.setProperty(
-        "--seconds-scale", msg.seconds_scale ?? 0.55
-      );
+      document.documentElement.style.setProperty("--seconds-scale", msg.seconds_scale ?? 0.55);
+      if (msg.font) {
+        document.documentElement.style.setProperty("--clock-font", `'${msg.font}', monospace`);
+      }
+      if (msg.accent_color) {
+        document.documentElement.style.setProperty("--accent", msg.accent_color);
+      }
       break;
 
     case "time_update":
