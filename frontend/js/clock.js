@@ -84,6 +84,10 @@ function dispatch(msg) {
     case "switch_view":
       handleSwitchView(msg.view);
       break;
+
+    case "ota_status":
+      handleOtaStatus(msg);
+      break;
   }
 }
 
@@ -121,11 +125,28 @@ function handleSwitchView(view) {
   }
 }
 
+function handleOtaStatus(msg) {
+  const el = document.getElementById("ota-status");
+  if (!el) return;
+  const labels = {
+    starting: "Checking for updates…",
+    success: `Updated: ${msg.detail || ""}`,
+    restarting: "Restarting, reconnecting shortly…",
+    error: `Update failed: ${msg.detail || "unknown error"}`,
+  };
+  el.textContent = labels[msg.status] ?? msg.status;
+  el.className = `ota-status-${msg.status}`;
+}
+
 // Expose send helpers so alarm.js can call them
 function sendMsg(obj) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(obj));
   }
+}
+
+function sendOtaTrigger() {
+  sendMsg({ type: "ota_trigger" });
 }
 
 connect();

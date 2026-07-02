@@ -163,3 +163,25 @@ html, body {
 /* Utility                                                              */
 /* ------------------------------------------------------------------ */
 .hidden { display: none !important; }
+
+/* ------------------------------------------------------------------ */
+/* OTA update panel                                                     */
+/* ------------------------------------------------------------------ */
+#ota-panel {
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-size: 0.7rem;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+#ota-panel:hover { opacity: 1; }
+#btn-update { font-size: 0.7rem; padding: 2px 8px; cursor: pointer; }
+#ota-status { max-width: 240px; text-align: right; }
+.ota-status-error { color: #f66; }
+.ota-status-success { color: #6f6; }
+.ota-status-restarting { color: #fa0; }

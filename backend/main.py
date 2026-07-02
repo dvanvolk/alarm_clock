@@ -228,7 +228,8 @@ async def handle_message(msg: dict, ws: WebSocket):
 
     elif mtype == "ota_trigger":
         from backend.updater import run_ota
-        asyncio.create_task(run_ota(manager))
+        branch = config.get("ota", {}).get("git_branch", "main")
+        asyncio.create_task(run_ota(manager, branch))
 
     else:
         log.warning("Unknown message type: %s", mtype)
