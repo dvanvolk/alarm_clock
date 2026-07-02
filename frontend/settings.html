@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alarm Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Orbitron:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    html, body {
+      overflow-y: auto !important;
+      overflow-x: hidden;
+      height: auto;
+      min-height: 100%;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      font-family: 'Exo 2', sans-serif;
+      padding: 0 0 20px;
+    }
+
+    /* Header */
+    #settings-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 20px;
+      border-bottom: 1px solid #1e1e1e;
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 10;
+    }
+
+    #btn-back {
+      color: var(--dim);
+      text-decoration: none;
+      font-size: 1rem;
+      padding: 6px 12px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    #btn-back:hover { color: var(--accent); border-color: var(--accent); }
+
+    #settings-header h1 {
+      font-family: 'Orbitron', monospace;
+      font-size: 1rem;
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      flex: 1;
+    }
+
+    #ws-status {
+      position: static;
+      flex-shrink: 0;
+    }
+
+    /* Alarm cards */
+    #alarm-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 20px;
+    }
+
+    .alarm-card {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 6px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .card-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-label {
+      color: var(--dim);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      min-width: 64px;
+      flex-shrink: 0;
+    }
+
+    /* Enabled toggle + label row */
+    .alarm-header-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .alarm-enabled {
+      width: 22px;
+      height: 22px;
+      accent-color: var(--accent);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .alarm-label-input {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid #333;
+      color: var(--text);
+      font-family: 'Exo 2', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      width: 100%;
+      padding: 2px 4px;
+      outline: none;
+    }
+    .alarm-label-input:focus { border-bottom-color: var(--accent); }
+
+    /* Time input */
+    .alarm-time {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: var(--text);
+      font-family: 'Orbitron', monospace;
+      font-size: 1.2rem;
+      padding: 6px 10px;
+      outline: none;
+      cursor: pointer;
+    }
+    .alarm-time:focus { border-color: var(--accent); }
+
+    /* Day checkboxes */
+    .days-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    .day-cb {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+
+    .day-cb input[type=checkbox] {
+      width: 28px;
+      height: 28px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .day-cb span {
+      font-size: 0.65rem;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Sound select */
+    .alarm-sound-select,
+    .alarm-melody-select {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: var(--text);
+      font-family: 'Exo 2', sans-serif;
+      font-size: 0.95rem;
+      padding: 6px 10px;
+      cursor: pointer;
+      outline: none;
+    }
+    .alarm-sound-select:focus,
+    .alarm-melody-select:focus { border-color: var(--accent); }
+
+    /* Music URI input */
+    .alarm-music-uri {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: var(--dim);
+      font-family: 'Exo 2', sans-serif;
+      font-size: 0.8rem;
+      padding: 6px 10px;
+      flex: 1;
+      outline: none;
+    }
+    .alarm-music-uri:focus { border-color: var(--accent); color: var(--text); }
+
+    /* Footer */
+    #settings-footer {
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    #btn-save {
+      font-family: 'Orbitron', monospace;
+      font-size: 0.9rem;
+      padding: 12px 36px;
+      border: 2px solid var(--accent);
+      background: transparent;
+      color: var(--accent);
+      cursor: pointer;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      transition: background 0.15s, color 0.15s;
+    }
+    #btn-save:hover, #btn-save:active {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    #save-status {
+      font-size: 0.85rem;
+      color: var(--dim);
+      transition: opacity 0.5s;
+    }
+    #save-status.ok { color: #6c6; }
+    #save-status.err { color: #f66; }
+  </style>
+</head>
+<body>
+
+  <div id="settings-header">
+    <a href="/" id="btn-back">← Clock</a>
+    <h1>Alarm Settings</h1>
+    <div id="ws-status" title="WebSocket status"></div>
+  </div>
+
+  <div id="alarm-list">
+    <p style="color:var(--dim);font-size:0.85rem;">Connecting…</p>
+  </div>
+
+  <div id="settings-footer">
+    <button id="btn-save" onclick="saveSettings()">Save</button>
+    <div id="save-status"></div>
+  </div>
+
+  <script src="js/settings.js"></script>
+</body>
+</html>

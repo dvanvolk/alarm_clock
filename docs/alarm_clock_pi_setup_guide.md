@@ -16,7 +16,7 @@ from a fresh SD card to a running kiosk.
 - DHT22 temperature and humidity sensor module
 - 4.7kΩ resistor (pull-up for DHT22 data line — skip if your DHT22 module has one built in)
 - Momentary push button (snooze)
-- Active buzzer
+- Passive piezo buzzer
 - WS2812B LED strip
 - MicroSD card (16GB minimum, Class 10 or better)
 - 5V/3A USB-C power supply (the official Pi PSU is recommended)
@@ -302,7 +302,7 @@ the HiFiBerry's pass-through header (same pin numbers).
           [27]●  ●[28]
           [29]●  ●[30]── GND
           [31]●  ●[32]── GPIO12
-          [33]●  ●[34]── GND
+  GPIO13──[33]●  ●[34]── GND
           [35]●  ●[36]
           [37]●  ●[38]
   GND   ──[39]●  ●[40]
@@ -319,16 +319,13 @@ the HiFiBerry's pass-through header (same pin numbers).
 | 7 | GPIO4 | DHT22 DATA (+ 4.7kΩ pull-up to 3.3V) |
 | 9 | GND | DHT22 GND, Snooze button (one leg) |
 | 11 | GPIO17 | Snooze button (other leg) — internal pull-up, no resistor needed |
-| 12 | GPIO18 | Buzzer (+) ⚠ see conflict note below |
-| 14 | GND | Buzzer (−) |
 | 32 | GPIO12 | WS2812B Data In |
-| 34 | GND | WS2812B GND (tie to external 5V supply GND) |
+| 33 | GPIO13 | Passive piezo (+) — PWM1, no HiFiBerry conflict |
+| 34 | GND | WS2812B GND (tie to external 5V supply GND) / piezo (−) |
 
-> ⚠ **GPIO18 / HiFiBerry conflict:** GPIO18 (Pin 12) is also the I2S bit-clock
-> used by the HiFiBerry DAC+ Pro. The buzzer and HiFiBerry I2S cannot both use
-> GPIO18 simultaneously. The buzzer fires only as a fallback when Music Assistant
-> is unavailable — most users can omit it. If you need both, use a different
-> hardware PWM pin (GPIO13 / Pin 33 is the other PWM1 option on Pi 3).
+> **Note:** The piezo buzzer is on GPIO13 (Pin 33, PWM1). Do not use GPIO18
+> (Pin 12) for the buzzer — that pin is the I2S bit-clock for the HiFiBerry
+> DAC+ Pro and cannot be shared. GPIO12 (Pin 32) is also taken by the LED strip.
 
 ---
 
@@ -341,14 +338,16 @@ the HiFiBerry's pass-through header (same pin numbers).
 
 The software uses the Pi's internal pull-up resistor — no external resistor needed.
 
-### 7.2 Active Buzzer (GPIO18)
+### 7.2 Passive Piezo Buzzer (GPIO13)
 
 | Buzzer Pin | Connection |
 |---|---|
-| + (positive) | GPIO18 (Pin 12) |
-| − (negative) | GND (Pin 14) |
+| + (positive) | GPIO13 (Pin 33) |
+| − (negative) | GND (Pin 34) |
 
-See GPIO18/HiFiBerry conflict note in the wiring diagram above.
+A passive piezo responds to PWM frequency, allowing the firmware to play tones
+at different pitches. An active buzzer (with an internal oscillator) will not
+respond to frequency changes and cannot play melodies — use a passive piezo.
 
 ### 7.3 WS2812B LED Strip (GPIO12)
 
@@ -735,7 +734,7 @@ Hardware
 [ ] BH1750 wired to I2C pins
 [ ] DHT22 wired to GPIO4 (VCC → 3.3V, GND → GND, DATA → GPIO4 + pull-up)
 [ ] Snooze button wired to GPIO17 and GND
-[ ] Active buzzer wired to GPIO18 and GND (if fitted — see HiFiBerry note)
+[ ] Passive piezo wired to GPIO13 (Pin 33) and GND (Pin 34) (if fitted)
 [ ] WS2812B data wire on GPIO12, powered from external 5V
 [ ] Touchscreen DSI cable connected
 [ ] Speakers connected via RCA to DAC+ Pro

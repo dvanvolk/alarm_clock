@@ -1,12 +1,33 @@
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Optional
 
 import backend.hardware as hw
 import backend.leds as leds
+
+# Standard equal-temperament note frequencies (Hz)
+_NOTES: dict[str, int] = {
+    "C4": 262, "D4": 294, "E4": 330, "F4": 349, "G4": 392, "A4": 440, "B4": 494,
+    "C5": 523, "D5": 587, "E5": 659, "F5": 698, "G5": 784, "A5": 880, "B5": 988,
+    "C6": 1047,
+}
+
+# Melody format: list of (note_name_or_hz, on_ms, off_ms). Use 0 Hz for a rest.
+_MELODIES: dict[str, list[tuple]] = {
+    "default": [   # ascending two-pitch alarm pattern
+        ("A4", 300, 100), ("A4", 300, 100), ("A5", 600, 300),
+        ("A4", 300, 100), ("A4", 300, 100), ("A5", 600, 800),
+    ],
+    "gentle": [    # soft ascending triad with long gaps
+        ("C5", 400, 100), ("E5", 400, 100), ("G5", 500, 200), ("C5", 800, 1000),
+    ],
+    "classic": [   # simple single-pitch beep-pause
+        ("A5", 500, 500),
+    ],
+}
 
 if TYPE_CHECKING:
     from backend.ha_client import HAClient
@@ -34,6 +55,7 @@ class Alarm:
     enabled: bool
     sound: str       # "music_assistant" | "buzzer"
     music_uri: str = ""
+    melody: str = "default"
 
     def matches(self, now: datetime) -> bool:
         if not self.enabled:
@@ -58,6 +80,7 @@ def _parse_alarms(config: dict) -> list[Alarm]:
             enabled=entry.get("enabled", True),
             sound=entry.get("sound", "buzzer"),
             music_uri=entry.get("music_uri", ""),
+            melody=entry.get("melody", "default"),
         ))
     return alarms
 
@@ -76,6 +99,7 @@ class AlarmScheduler:
         self._snooze_minutes = 9
         self._audio_cfg: dict = {}
         self._sunrise_cfg: dict = {}
+        self._buzzer_cfg: dict = {}
         self.reload(config)
 
     def set_ha_client(self, ha: "HAClient") -> None:
@@ -90,6 +114,7 @@ class AlarmScheduler:
         self._snooze_minutes = config.get("snooze", {}).get("duration_minutes", 9)
         self._audio_cfg = config.get("audio", {})
         self._sunrise_cfg = config.get("sunrise", {})
+        self._buzzer_cfg = config.get("buzzer", {})
         self._publish_ha_state()
 
     # ------------------------------------------------------------------
@@ -169,7 +194,8 @@ class AlarmScheduler:
         elif alarm.sound == "music_assistant":
             log.info("[NO HA] Would play Music Assistant: %s", alarm.music_uri)
         else:
-            self._buzz_task = asyncio.create_task(_buzz_loop())
+            duty = self._buzzer_cfg.get("duty_cycle", 50)
+            self._buzz_task = asyncio.create_task(_melody_loop(alarm.melody, duty))
 
         # Volume ramp — real via HA, stub fallback without it
         if self._ha:
@@ -279,12 +305,19 @@ async def _trigger_music(uri: str, audio_cfg: dict) -> None:
     log.info("[STUB] Would trigger Music Assistant: %s", uri)
 
 
-async def _buzz_loop() -> None:
-    """Beep the buzzer repeatedly until the task is cancelled."""
+async def _melody_loop(melody_name: str, duty: int) -> None:
+    """Play a melody on the piezo repeatedly until cancelled."""
+    melody = _MELODIES.get(melody_name, _MELODIES["default"])
     try:
         while True:
-            hw.buzz(880, 500)
-            await asyncio.sleep(1)
+            for note_or_hz, on_ms, off_ms in melody:
+                freq = _NOTES.get(note_or_hz, 0) if isinstance(note_or_hz, str) else note_or_hz
+                if freq > 0:
+                    hw.buzz(freq, duty)
+                await asyncio.sleep(on_ms / 1000)
+                hw.stop_buzz()
+                if off_ms > 0:
+                    await asyncio.sleep(off_ms / 1000)
     except asyncio.CancelledError:
         hw.stop_buzz()
 

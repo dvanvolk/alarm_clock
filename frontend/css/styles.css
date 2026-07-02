@@ -165,6 +165,21 @@ html, body {
 .hidden { display: none !important; }
 
 /* ------------------------------------------------------------------ */
+/* Settings nav                                                         */
+/* ------------------------------------------------------------------ */
+#btn-settings {
+  position: fixed;
+  top: 10px;
+  left: 14px;
+  font-size: 1.4rem;
+  color: #333;
+  text-decoration: none;
+  transition: color 0.2s;
+  line-height: 1;
+}
+#btn-settings:hover { color: var(--accent); }
+
+/* ------------------------------------------------------------------ */
 /* OTA update panel                                                     */
 /* ------------------------------------------------------------------ */
 #ota-panel {

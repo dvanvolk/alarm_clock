@@ -192,6 +192,11 @@ async def websocket_endpoint(ws: WebSocket):
         "font": clock_cfg.get("font", "Orbitron"),
         "accent_color": clock_cfg.get("accent_color", "#e8a020"),
     }))
+    await ws.send_text(json.dumps({
+        "type": "config_update",
+        "alarms": config.get("alarms", []),
+        "buzzer": config.get("buzzer", {}),
+    }))
     if scheduler:
         await ws.send_text(json.dumps(scheduler.state_message()))
     if ha_client and ha_client.last_weather:

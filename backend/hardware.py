@@ -18,8 +18,8 @@ log = logging.getLogger(__name__)
 IS_PI = platform.machine().lower().startswith(("arm", "aarch"))
 
 # GPIO pin assignments
-PIN_SNOOZE = 17   # active-low, internal pull-up
-PIN_BUZZER = 18   # hardware PWM
+PIN_SNOOZE = 17    # active-low, internal pull-up
+_buzzer_gpio = 13  # BCM GPIO13 (PWM1, Pin 33); overridden by config at startup
 
 # ---------------------------------------------------------------------------
 # Pi-only imports
@@ -50,7 +50,8 @@ else:
 # ---------------------------------------------------------------------------
 
 def setup_hardware(config: dict) -> None:
-    global _i2c, _rtc, _light
+    global _i2c, _rtc, _light, _buzzer_gpio
+    _buzzer_gpio = config.get("buzzer", {}).get("gpio_pin", 13)
 
     if not IS_PI:
         log.info("[STUB] Hardware setup skipped (not running on Pi)")
@@ -58,7 +59,7 @@ def setup_hardware(config: dict) -> None:
 
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(PIN_SNOOZE, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    GPIO.setup(PIN_BUZZER, GPIO.OUT)
+    GPIO.setup(_buzzer_gpio, GPIO.OUT)
 
     _i2c = busio.I2C(board.SCL, board.SDA)
     _rtc = adafruit_ds3231.DS3231(_i2c)
@@ -133,17 +134,18 @@ def set_rtc_time(dt: datetime) -> None:
     )
 
 
-def buzz(frequency: int = 880, duration_ms: int = 500) -> None:
-    """Start buzzer at frequency Hz; non-blocking on Pi (PWM runs in background)."""
+def buzz(frequency: int = 880, duty: int = 50) -> None:
+    """Start passive piezo at frequency Hz (non-blocking). Call stop_buzz() to silence."""
     global _buzzer_pwm
     if not IS_PI:
-        log.info("[STUB] buzz(%d Hz, %d ms)", frequency, duration_ms)
+        log.info("[STUB] buzz(%d Hz, duty=%d%%)", frequency, duty)
         return
     if _buzzer_pwm is None:
-        _buzzer_pwm = GPIO.PWM(PIN_BUZZER, frequency)
+        _buzzer_pwm = GPIO.PWM(_buzzer_gpio, frequency)
+        _buzzer_pwm.start(duty)
     else:
         _buzzer_pwm.ChangeFrequency(frequency)
-    _buzzer_pwm.start(50)  # 50% duty cycle
+        _buzzer_pwm.ChangeDutyCycle(duty)
 
 
 def stop_buzz() -> None:

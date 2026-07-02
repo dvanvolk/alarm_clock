@@ -26,12 +26,18 @@ alarms:
     enabled: true
     sound: music_assistant
     music_uri: "media-source://music_assistant/playlist/morning"
+    melody: "gentle"
 
 audio:
   volume_start: 20         # % volume when alarm starts
   volume_max: 80           # % volume ceiling
   volume_ramp_seconds: 120 # seconds to ramp from start to max
   fallback_buzzer: true    # use buzzer if Music Assistant unavailable
+
+buzzer:
+  gpio_pin: 13             # BCM GPIO13 = PWM1, Pin 33 (no HiFiBerry conflict)
+  melody: "default"        # global fallback melody; overridden per-alarm
+  duty_cycle: 50           # PWM duty cycle percent (0–100)
 
 snooze:
   duration_minutes: 9
