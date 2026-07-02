@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-Phases 1–6 are built and in testing. Phases 7–9 are not started. Phase 10 (voice control) is a future phase. See `docs/alarm_clock_architecture.md` for the full build order and phase details.
+Phases 1–9 are built and in testing. Phase 10 (voice control) is a future phase. See `docs/alarm_clock_architecture.md` for the full build order and phase details.
 
 ## Architecture
 

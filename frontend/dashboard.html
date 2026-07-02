@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Orbitron:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      font-family: 'Exo 2', sans-serif;
+    }
+
+    #dashboard-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 20px;
+      border-bottom: 1px solid #1e1e1e;
+      background: var(--bg);
+      flex-shrink: 0;
+    }
+
+    #btn-back {
+      color: var(--dim);
+      text-decoration: none;
+      font-size: 1rem;
+      padding: 6px 12px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    #btn-back:hover { color: var(--accent); border-color: var(--accent); }
+
+    #dashboard-header h1 {
+      font-family: 'Orbitron', monospace;
+      font-size: 1rem;
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      flex: 1;
+    }
+
+    #ws-status {
+      position: static;
+      flex-shrink: 0;
+    }
+
+    #ha-frame {
+      width: 100%;
+      flex: 1;
+      border: none;
+      background: #000;
+    }
+
+    #no-url-msg {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--dim);
+      font-size: 0.9rem;
+      text-align: center;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="dashboard-header">
+    <a href="/" id="btn-back">← Clock</a>
+    <h1>Dashboard</h1>
+    <div id="ws-status" title="WebSocket status"></div>
+  </div>
+
+  <iframe id="ha-frame" class="hidden" src="" allow="fullscreen" allowfullscreen></iframe>
+  <div id="no-url-msg">No dashboard URL configured.<br>Set one in Settings.</div>
+
+  <script>
+    const WS_URL = `ws://${location.host}/ws`;
+    let ws = null;
+    let reconnectDelay = 1000;
+
+    function connect() {
+      ws = new WebSocket(WS_URL);
+
+      ws.addEventListener('open', () => {
+        const dot = document.getElementById('ws-status');
+        if (dot) dot.className = 'connected';
+        reconnectDelay = 1000;
+      });
+
+      ws.addEventListener('close', () => {
+        const dot = document.getElementById('ws-status');
+        if (dot) dot.className = 'disconnected';
+        setTimeout(connect, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+      });
+
+      ws.addEventListener('message', (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'config_update' && msg.dashboard_url !== undefined) {
+          setDashboardUrl(msg.dashboard_url);
+        } else if (msg.type === 'switch_view' && msg.view !== 'dashboard') {
+          handleSwitchView(msg.view);
+        }
+      });
+    }
+
+    function setDashboardUrl(url) {
+      const frame = document.getElementById('ha-frame');
+      const noUrl = document.getElementById('no-url-msg');
+      if (url) {
+        frame.src = url;
+        frame.classList.remove('hidden');
+        noUrl.classList.add('hidden');
+      } else {
+        frame.classList.add('hidden');
+        noUrl.classList.remove('hidden');
+      }
+    }
+
+    function handleSwitchView(view) {
+      if (view === 'clock') window.location.href = '/';
+      else if (view === 'settings') window.location.href = '/settings.html';
+    }
+
+    connect();
+  </script>
+</body>
+</html>

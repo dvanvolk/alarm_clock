@@ -25,6 +25,10 @@ def load_config(path: str = "config/settings.yaml") -> dict:
     if mqtt_pass:
         ha["mqtt_pass"] = mqtt_pass
 
+    ha_dashboard_url = os.environ.get("HA_DASHBOARD_URL", "").strip()
+    if ha_dashboard_url:
+        ha["dashboard_url"] = ha_dashboard_url
+
     return cfg
 
 

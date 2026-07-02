@@ -289,11 +289,11 @@ Volume is controlled via ALSA — use `amixer` / `alsamixer` from the command li
 | 2 | Clock face UI — time display, WebSocket client, basic styling | Built — in testing |
 | 3 | Hardware layer — RTC, light sensor, GPIO snooze button, buzzer | Built — in testing |
 | 4 | Alarm logic — scheduling, firing, snooze, Music Assistant trigger | Built — in testing |
-| 5 | Home Assistant integration — MQTT discovery, weather polling | Not started |
-| 6 | Sunrise LED effect | Not started |
-| 7 | Settings UI — form, save back to YAML | Not started |
-| 8 | HA dashboard idle/embed screen | Not started |
-| 9 | OTA update mechanism | Not started |
+| 5 | Home Assistant integration — MQTT discovery, weather polling | Built — in testing |
+| 6 | Sunrise LED effect | Built — in testing |
+| 7 | Settings UI — form, save back to YAML | Built — in testing |
+| 8 | HA dashboard idle/embed screen | Built — in testing |
+| 9 | OTA update mechanism | Built — in testing |
 | 10 | Voice control — Wyoming satellite, USB mic, local STT/TTS | Future phase |
 
 ---

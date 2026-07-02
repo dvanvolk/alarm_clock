@@ -62,6 +62,7 @@ weather:
 
 home_assistant:
   url: "http://homeassistant.local:8123"
+  dashboard_url: "http://homeassistant.local:8123/lovelace/0"  # URL shown in the dashboard iframe
   token: ""                    # Set via HA_TOKEN in .env — do not put real token here
   mqtt_broker: "homeassistant.local"
   mqtt_port: 1883

@@ -41,6 +41,10 @@ function connect() {
     if (msg.type === 'config_update') {
       currentAlarms = msg.alarms || [];
       renderAlarms(currentAlarms);
+      const urlInput = document.getElementById('dashboard-url');
+      if (urlInput && msg.dashboard_url !== undefined) {
+        urlInput.value = msg.dashboard_url;
+      }
     }
   });
 }
@@ -152,7 +156,8 @@ function saveSettings() {
     };
   });
 
-  sendMsg({ type: 'settings_save', settings: { alarms } });
+  const dashboardUrl = (document.getElementById('dashboard-url')?.value ?? '').trim();
+  sendMsg({ type: 'settings_save', settings: { alarms, dashboard_url: dashboardUrl } });
   showSaveStatus('Saved', 'ok');
 }
 

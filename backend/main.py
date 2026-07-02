@@ -196,6 +196,7 @@ async def websocket_endpoint(ws: WebSocket):
         "type": "config_update",
         "alarms": config.get("alarms", []),
         "buzzer": config.get("buzzer", {}),
+        "dashboard_url": config.get("home_assistant", {}).get("dashboard_url", ""),
     }))
     if scheduler:
         await ws.send_text(json.dumps(scheduler.state_message()))
@@ -222,6 +223,9 @@ async def handle_message(msg: dict, ws: WebSocket):
 
     elif mtype == "settings_save":
         new_cfg = msg.get("settings", {})
+        dashboard_url = new_cfg.pop("dashboard_url", None)
+        if dashboard_url is not None:
+            config.setdefault("home_assistant", {})["dashboard_url"] = dashboard_url
         config.update(new_cfg)
         save_config(config)
         scheduler.reload(config)

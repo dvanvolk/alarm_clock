@@ -228,6 +228,51 @@
     }
     #save-status.ok { color: #6c6; }
     #save-status.err { color: #f66; }
+
+    /* General settings section */
+    #general-settings {
+      padding: 0 20px 20px;
+    }
+
+    .section-header {
+      font-family: 'Orbitron', monospace;
+      font-size: 0.75rem;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      padding: 16px 0 10px;
+      border-bottom: 1px solid #1e1e1e;
+      margin-bottom: 14px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .setting-label {
+      color: var(--dim);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      min-width: 100px;
+      flex-shrink: 0;
+    }
+
+    .setting-input {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: var(--dim);
+      font-family: 'Exo 2', sans-serif;
+      font-size: 0.85rem;
+      padding: 6px 10px;
+      flex: 1;
+      outline: none;
+    }
+    .setting-input:focus { border-color: var(--accent); color: var(--text); }
   </style>
 </head>
 <body>
@@ -240,6 +285,15 @@
 
   <div id="alarm-list">
     <p style="color:var(--dim);font-size:0.85rem;">Connecting…</p>
+  </div>
+
+  <div id="general-settings">
+    <div class="section-header">Home Assistant</div>
+    <div class="setting-row">
+      <label for="dashboard-url" class="setting-label">Dashboard URL</label>
+      <input type="url" id="dashboard-url" class="setting-input"
+             placeholder="http://homeassistant.local:8123/lovelace/0">
+    </div>
   </div>
 
   <div id="settings-footer">
