@@ -674,7 +674,7 @@ xinput_calibrator
 ```
 
 Follow the on-screen prompts and save the calibration output to:
-```bash
+```bash 
 sudo nano /etc/X11/xorg.conf.d/99-calibration.conf
 ```
 

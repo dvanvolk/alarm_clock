@@ -47,7 +47,12 @@ def setup_leds(num_leds: int, max_brightness: int) -> None:
         num_leds, _LED_PIN, _LED_FREQ, _LED_DMA,
         _LED_INVERT, max_brightness, _LED_CHANNEL,
     )
-    _strip.begin()
+    try:
+        _strip.begin()
+    except RuntimeError as e:
+        log.warning("LED strip init failed — LEDs disabled. Run service as root or add /dev/vcio udev rule. (%s)", e)
+        _strip = None
+        return
     log.info("LED strip ready: %d LEDs on GPIO%d", num_leds, _LED_PIN)
 
 
