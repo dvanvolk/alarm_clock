@@ -20,7 +20,6 @@ import errno
 import platform
 import subprocess
 import sys
-import threading
 import time
 from datetime import datetime
 
@@ -200,31 +199,22 @@ def test_bh1750() -> None:
 
 
 def test_ds3231() -> None:
-    i2c = None
+    # The kernel owns the DS3231 via the i2c-rtc overlay (shows as UU in i2cdetect).
+    # Read through the kernel sysfs RTC interface instead of directly via I2C.
     try:
-        import board
-        import busio
-        import adafruit_ds3231
-        i2c = busio.I2C(board.SCL, board.SDA)
-        rtc = adafruit_ds3231.DS3231(i2c)
-        t = rtc.datetime
-        rtc_dt = datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
+        rtc_date = open("/sys/class/rtc/rtc0/date").read().strip()   # YYYY-MM-DD
+        rtc_time = open("/sys/class/rtc/rtc0/time").read().strip()   # HH:MM:SS
+        rtc_dt = datetime.strptime(f"{rtc_date} {rtc_time}", "%Y-%m-%d %H:%M:%S")
         sys_dt = datetime.utcnow()
         diff = (rtc_dt - sys_dt).total_seconds()
         detail = f"RTC={rtc_dt.strftime('%Y-%m-%d %H:%M:%S')}  sys-diff={diff:+.0f}s"
         if abs(diff) > RTC_DRIFT_WARN:
-            detail += f"  [WARNING: drift >{RTC_DRIFT_WARN}s — run: sudo hwclock -w]"
+            detail += f"  [WARNING: drift >{RTC_DRIFT_WARN}s — check timedatectl]"
         record("ds3231", PASS, detail)
-    except ImportError as e:
-        record("ds3231", FAIL, f"missing library: {e}")
+    except FileNotFoundError:
+        record("ds3231", FAIL, "/sys/class/rtc/rtc0 not found — is dtoverlay=i2c-rtc,ds3231 in /boot/firmware/config.txt?")
     except Exception as e:
         record("ds3231", FAIL, str(e))
-    finally:
-        if i2c is not None:
-            try:
-                i2c.deinit()
-            except Exception:
-                pass
 
 
 def test_dht22() -> None:
@@ -318,7 +308,7 @@ def test_leds() -> None:
             for i in range(_num_leds):
                 _strip.setPixelColor(i, colour)
             _strip.show()
-            time.sleep(1)
+            time.sleep(2)
 
         for i in range(_num_leds):
             _strip.setPixelColor(i, Color(0, 0, 0))
@@ -337,32 +327,21 @@ def test_snooze() -> None:
         record("snooze", FAIL, f"missing library: {e}")
         return
 
-    pressed_event = threading.Event()
-    press_time: list[float] = []
-
     try:
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(PIN_SNOOZE, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-        def _on_press(channel):
-            press_time.append(time.time())
-            pressed_event.set()
-
-        start = time.time()
-        GPIO.add_event_detect(PIN_SNOOZE, GPIO.FALLING, callback=_on_press, bouncetime=300)
         print(f"  Press the snooze button within {SNOOZE_TIMEOUT} seconds...")
-        pressed_event.wait(timeout=SNOOZE_TIMEOUT)
-
-        try:
-            GPIO.remove_event_detect(PIN_SNOOZE)
-        except Exception:
-            pass
-
+        start = time.time()
+        pressed = False
+        while time.time() - start < SNOOZE_TIMEOUT:
+            if GPIO.input(PIN_SNOOZE) == GPIO.LOW:
+                pressed = True
+                break
+            time.sleep(0.05)
         GPIO.cleanup(PIN_SNOOZE)
-
-        if pressed_event.is_set():
-            elapsed = press_time[0] - start if press_time else 0.0
+        elapsed = time.time() - start
+        if pressed:
             record("snooze", PASS, f"pressed in {elapsed:.1f}s")
         else:
             record("snooze", FAIL, f"timeout — not pressed within {SNOOZE_TIMEOUT}s")

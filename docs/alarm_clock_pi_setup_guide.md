@@ -435,12 +435,14 @@ sudo usermod -a -G gpio pi
 ### 9.1 Clone the Repository
 
 ```bash
-cd /home/pi
+cd ~
 git clone https://github.com/YOUR_USERNAME/alarm-clock.git
 cd alarm-clock
 ```
 
-> Replace `YOUR_USERNAME/alarm-clock` with your actual repository path.
+> Replace `YOUR_USERNAME/alarm-clock` with your actual repository path and
+> directory name. The remaining steps in Part 9 assume you are running commands
+> from inside the project directory (`cd ~/alarm-clock` before each session).
 
 ### 9.2 Create a Virtual Environment
 
@@ -464,7 +466,7 @@ With all Python packages installed and hardware wired (Part 7), run the hardware
 test script to verify every component before configuring the application:
 
 ```bash
-sudo /home/pi/alarm-clock/venv/bin/python scripts/test_hardware.py
+sudo venv/bin/python scripts/test_hardware.py
 ```
 
 The script runs automated tests first (I2C scan, BH1750, DS3231, DHT22), then
