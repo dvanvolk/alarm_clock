@@ -28,19 +28,16 @@ if IS_PI:
     import RPi.GPIO as GPIO
     import board
     import busio
-    import adafruit_ds3231
     import adafruit_bh1750
     import adafruit_dht
 
     _i2c = None
-    _rtc = None
     _light = None
     _buzzer_pwm = None
     _dht = None
 else:
     GPIO = None
     _i2c = None
-    _rtc = None
     _light = None
     _buzzer_pwm = None
     _dht = None
@@ -50,7 +47,7 @@ else:
 # ---------------------------------------------------------------------------
 
 def setup_hardware(config: dict) -> None:
-    global _i2c, _rtc, _light, _buzzer_gpio
+    global _i2c, _light, _buzzer_gpio
     _buzzer_gpio = config.get("buzzer", {}).get("gpio_pin", 13)
 
     if not IS_PI:
@@ -62,9 +59,8 @@ def setup_hardware(config: dict) -> None:
     GPIO.setup(_buzzer_gpio, GPIO.OUT)
 
     _i2c = busio.I2C(board.SCL, board.SDA)
-    _rtc = adafruit_ds3231.DS3231(_i2c)
     _light = adafruit_bh1750.BH1750(_i2c)
-    log.info("Hardware initialised (GPIO, I2C, RTC, light sensor)")
+    log.info("Hardware initialised (GPIO, I2C, light sensor)")
 
 
 def setup_dht22(gpio_pin: int) -> None:
@@ -118,20 +114,21 @@ def get_lux() -> float:
 
 
 def get_rtc_time() -> datetime:
-    if not IS_PI or _rtc is None:
+    if not IS_PI:
         return datetime.now()
-    t = _rtc.datetime
-    return datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
+    try:
+        # The kernel owns the DS3231 via i2c-rtc overlay; read through sysfs.
+        date_str = open("/sys/class/rtc/rtc0/date").read().strip()
+        time_str = open("/sys/class/rtc/rtc0/time").read().strip()
+        return datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
+    except Exception as e:
+        log.warning("RTC sysfs read failed, falling back to system time: %s", e)
+        return datetime.now()
 
 
 def set_rtc_time(dt: datetime) -> None:
-    if not IS_PI or _rtc is None:
-        log.debug("[STUB] set_rtc_time(%s)", dt)
-        return
-    import time
-    _rtc.datetime = time.struct_time(
-        (dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.weekday(), -1, -1)
-    )
+    # On Bookworm with the i2c-rtc overlay, systemd syncs the RTC automatically.
+    log.debug("set_rtc_time(%s) — no-op, systemd manages RTC sync on Bookworm", dt)
 
 
 def buzz(frequency: int = 880, duty: int = 50) -> None:
