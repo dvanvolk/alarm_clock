@@ -6,8 +6,6 @@ Run from the project root with the venv active:
 
     sudo venv/bin/python scripts/test_hardware.py
 
-Requires pigpiod to be running (sudo systemctl start pigpiod).
-
 Options:
     --leds N                Number of WS2812B LEDs in your strip (default: 6)
     --test NAME[,NAME...]   Run only specific tests (comma-separated)
@@ -36,7 +34,7 @@ IS_PI = platform.machine().lower().startswith(("arm", "aarch"))
 # ---------------------------------------------------------------------------
 
 PIN_SNOOZE     = 17
-PIN_BUZZER     = 13       # hardware PWM1 (DMA)
+PIN_BUZZER     = 13       # software PWM via gpiozero/lgpio
 PIN_DHT22      = 4
 PIN_LED        = 12       # hardware PWM0 (DMA, used by rpi_ws281x)
 
@@ -49,8 +47,8 @@ LED_INVERT     = False
 LED_CHANNEL    = 0
 LED_BRIGHTNESS = 64        # ~25% — visible without being blinding
 
-BUZZ_FREQ      = 880       # Hz (A5) — hardware PWM via pigpio DMA
-BUZZ_DUTY      = 50        # PWM duty cycle % (0–100); pigpio uses 0–1,000,000
+BUZZ_FREQ      = 880       # Hz (A5) — software PWM via gpiozero/lgpio
+BUZZ_DUTY      = 50        # PWM duty cycle % (0–100)
 
 SNOOZE_TIMEOUT  = 10       # seconds to wait for button press
 DHT_RETRIES     = 5
@@ -61,11 +59,11 @@ RTC_DRIFT_WARN  = 60       # seconds — emit warning above this threshold
 # Module-level state for cleanup (set inside test/loop functions)
 # ---------------------------------------------------------------------------
 
-_pi      = None   # pigpio.pi() — must call .stop() to release DMA resources
-_button  = None   # gpiozero.Button — must call .close()
-_dht_device = None   # adafruit_dht — must call .exit() to release gpiod handle
-_strip   = None   # rpi_ws281x PixelStrip — clear pixels before stopping
-_num_leds = 6     # set from --leds arg in main()
+_buzzer_dev  = None   # gpiozero.PWMOutputDevice — must call .close()
+_button      = None   # gpiozero.Button — must call .close()
+_dht_device  = None   # adafruit_dht — must call .exit() to release gpiod handle
+_strip       = None   # rpi_ws281x PixelStrip — clear pixels before stopping
+_num_leds    = 6      # set from --leds arg in main()
 
 # ---------------------------------------------------------------------------
 # Results tracking
@@ -97,18 +95,18 @@ def _ask(question: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def cleanup() -> None:
-    global _pi, _button, _dht_device, _strip
+    global _buzzer_dev, _button, _dht_device, _strip
 
-    # 1. Stop buzzer and release pigpio DMA resources
-    if _pi is not None:
+    # 1. Stop and release buzzer PWM device
+    if _buzzer_dev is not None:
         try:
-            _pi.hardware_PWM(PIN_BUZZER, 0, 0)
-            _pi.stop()
+            _buzzer_dev.value = 0
+            _buzzer_dev.close()
         except Exception:
             pass
-        _pi = None
+        _buzzer_dev = None
 
-    # 2. Close gpiozero button (releases pigpio pin)
+    # 2. Close gpiozero button (releases lgpio pin)
     if _button is not None:
         try:
             _button.close()
@@ -258,24 +256,20 @@ def test_dht22() -> None:
 
 
 def test_buzzer() -> None:
-    global _pi
+    global _buzzer_dev
     try:
-        import pigpio
+        from gpiozero import PWMOutputDevice
     except ImportError as e:
         record("buzzer", FAIL, f"missing library: {e}")
         return
     try:
-        _pi = pigpio.pi()
-        if not _pi.connected:
-            record("buzzer", FAIL, "pigpiod not running — sudo systemctl start pigpiod")
-            _pi = None
-            return
-        print(f"  Playing {BUZZ_FREQ}Hz tone via hardware PWM for 3 seconds...")
-        _pi.hardware_PWM(PIN_BUZZER, BUZZ_FREQ, BUZZ_DUTY * 10_000)
+        _buzzer_dev = PWMOutputDevice(PIN_BUZZER, frequency=BUZZ_FREQ, initial_value=0)
+        print(f"  Playing {BUZZ_FREQ}Hz tone via software PWM for 3 seconds...")
+        _buzzer_dev.value = BUZZ_DUTY / 100
         time.sleep(3)
-        _pi.hardware_PWM(PIN_BUZZER, 0, 0)
-        _pi.stop()
-        _pi = None
+        _buzzer_dev.value = 0
+        _buzzer_dev.close()
+        _buzzer_dev = None
         passed = _ask("Did you hear the buzzer?")
         record("buzzer", PASS if passed else FAIL, "User confirmed" if passed else "User did not confirm")
     except Exception as e:
@@ -322,13 +316,11 @@ def test_snooze() -> None:
     try:
         import threading
         from gpiozero import Button
-        from gpiozero.pins.pigpio import PiGPIOFactory
     except ImportError as e:
         record("snooze", FAIL, f"missing library: {e}")
         return
     try:
-        factory = PiGPIOFactory()
-        _button = Button(PIN_SNOOZE, pull_up=True, bounce_time=0.3, pin_factory=factory)
+        _button = Button(PIN_SNOOZE, pull_up=True, bounce_time=0.3)
         pressed_event = threading.Event()
         start = time.time()
         _button.when_pressed = lambda: pressed_event.set()
@@ -529,7 +521,6 @@ def loop_snooze() -> None:
     try:
         import threading
         from gpiozero import Button
-        from gpiozero.pins.pigpio import PiGPIOFactory
     except ImportError as e:
         print(f"  missing library: {e}")
         return
@@ -542,8 +533,7 @@ def loop_snooze() -> None:
             count += 1
             print(f"  Press #{count}")
 
-    factory = PiGPIOFactory()
-    _button = Button(PIN_SNOOZE, pull_up=True, bounce_time=0.3, pin_factory=factory)
+    _button = Button(PIN_SNOOZE, pull_up=True, bounce_time=0.3)
     _button.when_pressed = on_press
     print("  Snooze button — counting presses (Ctrl+C to stop)\n")
     try:
@@ -561,35 +551,31 @@ def loop_snooze() -> None:
 
 
 def loop_buzzer() -> None:
-    global _pi
+    global _buzzer_dev
     try:
-        import pigpio
+        from gpiozero import PWMOutputDevice
     except ImportError as e:
         print(f"  missing library: {e}")
         return
-    _pi = pigpio.pi()
-    if not _pi.connected:
-        print("  pigpiod not running — sudo systemctl start pigpiod")
-        _pi = None
-        return
-    print(f"  Buzzer — {BUZZ_FREQ}Hz hardware PWM on/off (Ctrl+C to stop)\n")
+    _buzzer_dev = PWMOutputDevice(PIN_BUZZER, frequency=BUZZ_FREQ, initial_value=0)
+    print(f"  Buzzer — {BUZZ_FREQ}Hz software PWM on/off (Ctrl+C to stop)\n")
     try:
         while True:
             print("  ON")
-            _pi.hardware_PWM(PIN_BUZZER, BUZZ_FREQ, BUZZ_DUTY * 10_000)
+            _buzzer_dev.value = BUZZ_DUTY / 100
             time.sleep(0.5)
-            _pi.hardware_PWM(PIN_BUZZER, 0, 0)
+            _buzzer_dev.value = 0
             print("  off")
             time.sleep(0.5)
     except KeyboardInterrupt:
         pass
     finally:
         try:
-            _pi.hardware_PWM(PIN_BUZZER, 0, 0)
-            _pi.stop()
+            _buzzer_dev.value = 0
+            _buzzer_dev.close()
         except Exception:
             pass
-        _pi = None
+        _buzzer_dev = None
 
 
 LOOP_TESTS: dict[str, callable] = {
@@ -686,7 +672,6 @@ def main() -> None:
     print()
     print("Alarm Clock Hardware Test")
     print(f"LEDs: {_num_leds}   Tests: {', '.join(requested)}")
-    print("Requires: sudo systemctl start pigpiod")
     print()
 
     for name, _ in ALL_TESTS:

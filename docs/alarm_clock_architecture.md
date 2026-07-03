@@ -198,7 +198,7 @@ IDLE → SUNRISE (if enabled, ramp_minutes before alarm time)
 | Light Sensor | BH1750 over I2C | Auto-dimming; shares I2C bus with DS3231 |
 | LED Sunrise | WS2812B via rpi_ws281x | GPIO PWM, requires root or udev rule |
 | Audio (primary) | Music Assistant via HA service call | HA triggers playback on alarm |
-| Audio (fallback) | GPIO buzzer via pigpio DMA PWM | Fires if Music Assistant unavailable |
+| Audio (fallback) | GPIO buzzer via gpiozero software PWM | Fires if Music Assistant unavailable |
 | Config | YAML file | Loaded at startup; written back by settings UI |
 | Process manager | systemd | Auto-start, restart on crash, logging |
 | OTA Updates | git pull + systemd restart | Triggered via MQTT message or UI button |
@@ -212,7 +212,7 @@ IDLE → SUNRISE (if enabled, ramp_minutes before alarm time)
 | `fastapi` | REST API and WebSocket server |
 | `uvicorn` | ASGI server to run FastAPI |
 | `websockets` | WebSocket client (for HA connection) |
-| `gpiozero` + `pigpio` | GPIO control — snooze button (edge detection), buzzer DMA PWM |
+| `gpiozero` + `lgpio` | GPIO control — snooze button edge detection, buzzer software PWM |
 | `smbus2` | I2C communication — DS3231, BH1750 |
 | `adafruit-circuitpython-ds3231` | RTC read/write |
 | `adafruit-circuitpython-bh1750` | Light sensor readings |

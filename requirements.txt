@@ -9,7 +9,7 @@ python-dotenv
 
 # Pi-only hardware libraries
 gpiozero
-pigpio
+lgpio
 smbus2
 adafruit-circuitpython-ds3231
 adafruit-circuitpython-bh1750

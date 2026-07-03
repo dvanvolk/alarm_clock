@@ -1,9 +1,8 @@
 """
 Hardware abstraction layer.
 
-On a Raspberry Pi: uses gpiozero (with pigpio backend) for the snooze button,
-pigpio hardware PWM (DMA) for the buzzer, and Adafruit CircuitPython drivers
-for the BH1750 light sensor and DHT22. The pigpiod daemon must be running.
+On Raspberry Pi OS Bookworm: uses gpiozero with the lgpio backend (default on
+Bookworm) for the snooze button and software PWM buzzer. No daemon required.
 
 On any other platform: all calls are no-ops or return plausible stub values
 so the backend runs normally during development on a Windows/macOS machine.
@@ -20,7 +19,7 @@ IS_PI = platform.machine().lower().startswith(("arm", "aarch"))
 
 # GPIO pin assignments
 PIN_SNOOZE = 17    # active-low, internal pull-up
-_buzzer_gpio = 13  # BCM GPIO13 = hardware PWM1 (Pin 33); overridden by config
+_buzzer_gpio = 13  # BCM GPIO13; overridden by config
 
 # ---------------------------------------------------------------------------
 # Pi-only imports
@@ -30,20 +29,16 @@ if IS_PI:
     import busio
     import adafruit_bh1750
     import adafruit_dht
-    import pigpio
-    from gpiozero import Button
-    from gpiozero.pins.pigpio import PiGPIOFactory
+    from gpiozero import Button, PWMOutputDevice
 
-    _pi: pigpio.pi | None = None
-    _factory: PiGPIOFactory | None = None
     _button: Button | None = None
+    _buzzer: PWMOutputDevice | None = None
     _i2c = None
     _light = None
     _dht = None
 else:
-    _pi = None
-    _factory = None
     _button = None
+    _buzzer = None
     _i2c = None
     _light = None
     _dht = None
@@ -53,23 +48,17 @@ else:
 # ---------------------------------------------------------------------------
 
 def setup_hardware(config: dict) -> None:
-    global _pi, _factory, _i2c, _light, _buzzer_gpio
+    global _buzzer, _i2c, _light, _buzzer_gpio
     _buzzer_gpio = config.get("buzzer", {}).get("gpio_pin", 13)
 
     if not IS_PI:
         log.info("[STUB] Hardware setup skipped (not running on Pi)")
         return
 
-    _pi = pigpio.pi()
-    if not _pi.connected:
-        raise RuntimeError(
-            "Cannot connect to pigpiod — run: sudo systemctl start pigpiod"
-        )
-
-    _factory = PiGPIOFactory()
+    _buzzer = PWMOutputDevice(_buzzer_gpio, frequency=1000, initial_value=0)
     _i2c = busio.I2C(board.SCL, board.SDA)
     _light = adafruit_bh1750.BH1750(_i2c)
-    log.info("Hardware initialised (pigpio DMA, I2C, light sensor)")
+    log.info("Hardware initialised (gpiozero/lgpio, I2C, light sensor)")
 
 
 def setup_dht22(gpio_pin: int) -> None:
@@ -109,6 +98,11 @@ def cleanup() -> None:
     if not IS_PI:
         return
     stop_buzz()
+    if _buzzer is not None:
+        try:
+            _buzzer.close()
+        except Exception:
+            pass
     if _button is not None:
         try:
             _button.close()
@@ -117,11 +111,6 @@ def cleanup() -> None:
     if _i2c is not None:
         try:
             _i2c.deinit()
-        except Exception:
-            pass
-    if _pi is not None:
-        try:
-            _pi.stop()
         except Exception:
             pass
     log.info("Hardware cleaned up")
@@ -152,26 +141,26 @@ def set_rtc_time(dt: datetime) -> None:
 
 
 def buzz(frequency: int = 880, duty: int = 50) -> None:
-    """Start passive piezo via hardware PWM (DMA). Call stop_buzz() to silence."""
-    if not IS_PI or _pi is None:
+    """Start passive piezo via software PWM. Call stop_buzz() to silence."""
+    if not IS_PI or _buzzer is None:
         log.info("[STUB] buzz(%d Hz, duty=%d%%)", frequency, duty)
         return
-    # pigpio hardware_PWM dutycycle range: 0–1,000,000 (0–100%)
-    _pi.hardware_PWM(_buzzer_gpio, frequency, duty * 10_000)
+    _buzzer.frequency = frequency
+    _buzzer.value = duty / 100
 
 
 def stop_buzz() -> None:
-    if not IS_PI or _pi is None:
+    if not IS_PI or _buzzer is None:
         log.debug("[STUB] stop_buzz()")
         return
-    _pi.hardware_PWM(_buzzer_gpio, 0, 0)
+    _buzzer.value = 0
 
 
 def setup_snooze_button(callback: Callable) -> None:
     global _button
-    if not IS_PI or _factory is None:
+    if not IS_PI:
         log.info("[STUB] Snooze button not wired (not on Pi)")
         return
-    _button = Button(PIN_SNOOZE, pull_up=True, bounce_time=0.3, pin_factory=_factory)
+    _button = Button(PIN_SNOOZE, pull_up=True, bounce_time=0.3)
     _button.when_pressed = callback
-    log.info("Snooze button ready on GPIO%d (gpiozero + pigpio DMA)", PIN_SNOOZE)
+    log.info("Snooze button ready on GPIO%d (gpiozero/lgpio)", PIN_SNOOZE)

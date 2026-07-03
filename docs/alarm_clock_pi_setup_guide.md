@@ -401,25 +401,10 @@ sudo apt install -y \
   libasound2-dev \
   chrony \
   i2c-tools \
-  libgpiod3 \
-  pigpio
+  libgpiod3
 ```
 
-### 8.2 Enable pigpiod (GPIO Daemon)
-
-The backend uses `pigpio` for DMA-based hardware PWM (buzzer on GPIO13) and
-reliable edge detection (snooze button on GPIO17). The `pigpiod` daemon must
-be running before the alarm-clock service starts.
-
-Enable it to start on boot and start it now:
-
-```bash
-sudo systemctl enable pigpiod
-sudo systemctl start pigpiod
-sudo systemctl status pigpiod   # should show: active (running)
-```
-
-### 8.3 WS2812B LED Support
+### 8.2 WS2812B LED Support
 
 The `rpi_ws281x` library requires root or a specific udev rule to access PWM.
 Install the library:
@@ -477,11 +462,10 @@ pip install -r requirements.txt
 
 ### 9.4 Run the Hardware Test
 
-Make sure `pigpiod` is running (Part 8.2), then run the hardware test script to
-verify every component before configuring the application:
+With all Python packages installed and hardware wired (Part 7), run the hardware
+test script to verify every component before configuring the application:
 
 ```bash
-sudo systemctl start pigpiod   # if not already running
 sudo venv/bin/python scripts/test_hardware.py
 ```
 
@@ -817,11 +801,8 @@ amixer sset 'Digital' 80%
 # Check RTC time and NTP sync status
 chronyc tracking
 
-# Check pigpiod is running
-sudo systemctl status pigpiod
-
-# Quick GPIO check via pigpio
-python3 -c "import pigpio; pi = pigpio.pi(); print('pigpio OK' if pi.connected else 'pigpiod not running'); pi.stop()"
+# Quick GPIO check via gpiozero/lgpio
+python3 -c "from gpiozero import Device; print('gpiozero OK, factory:', Device.pin_factory.__class__.__name__)"
 
 # Test DHT22 sensor directly (run from project root, venv active)
 python3 -c "

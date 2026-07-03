@@ -1,7 +1,6 @@
 [Unit]
 Description=Alarm Clock Backend
-After=network.target pigpiod.service
-Requires=pigpiod.service
+After=network.target
 
 [Service]
 Type=simple

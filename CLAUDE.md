@@ -58,7 +58,7 @@ alarm-clock/
 
 - The backend must be fully async (`asyncio`) — hardware polling, WebSocket clients, and the alarm scheduler all run as concurrent tasks under the same event loop.
 - `rpi_ws281x` (WS2812B LED control) requires root or a udev rule; plan accordingly.
-- GPIO is handled by `gpiozero` (snooze button edge detection) and `pigpio` (DMA hardware PWM for buzzer). `RPi.GPIO` is not used. `pigpiod` must be running on the Pi (`sudo systemctl start pigpiod`) before the service starts.
+- GPIO is handled by `gpiozero` with the `lgpio` backend (default on Bookworm) for both the snooze button (edge detection) and buzzer (software PWM). `RPi.GPIO` is not used and no daemon is required.
 - I2C libraries (`smbus2`, Adafruit CircuitPython) are hardware-specific — mock or skip on non-Pi dev machines.
 - The DS3231 RTC is a fallback time source only; `chrony` syncs NTP → system clock → DS3231. On Bookworm the kernel owns the DS3231 via `i2c-rtc` overlay; read it via `/sys/class/rtc/rtc0/`.
 - Home Assistant integration uses both MQTT Discovery (device registration) and the HA WebSocket API (weather entity polling, Music Assistant service calls).
