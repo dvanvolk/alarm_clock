@@ -75,9 +75,9 @@ sudo systemctl start alarm-clock
 sudo systemctl status alarm-clock
 sudo journalctl -u alarm-clock -f
 
-# Install Python dependencies
-pip install fastapi uvicorn websockets RPi.GPIO smbus2 \
-  adafruit-circuitpython-ds3231 adafruit-circuitpython-bh1750 \
-  adafruit-circuitpython-dht rpi-ws281x pyyaml paho-mqtt \
-  python-dateutil alsaaudio
+# Install Python dependencies (Raspberry Pi)
+pip install -r requirements.txt
+
+# Install Python dependencies (Windows dev)
+pip install -r requirements-windows.txt
 ```

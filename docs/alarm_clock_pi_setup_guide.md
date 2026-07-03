@@ -451,21 +451,7 @@ source venv/bin/activate
 ### 9.3 Install Python Dependencies
 
 ```bash
-pip install \
-  fastapi \
-  uvicorn \
-  websockets \
-  RPi.GPIO \
-  smbus2 \
-  adafruit-circuitpython-ds3231 \
-  adafruit-circuitpython-bh1750 \
-  adafruit-circuitpython-dht \
-  rpi-ws281x \
-  pyyaml \
-  paho-mqtt \
-  python-dateutil \
-  python-dotenv \
-  alsaaudio
+pip install -r requirements.txt
 ```
 
 > `adafruit-circuitpython-dht` requires `libgpiod3`, which is included in the

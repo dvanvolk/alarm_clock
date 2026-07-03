@@ -1,0 +1,10 @@
+# Windows dev dependencies — cross-platform packages only
+# Pi-only hardware libraries (RPi.GPIO, smbus2, adafruit-*, rpi-ws281x, alsaaudio)
+# are not included; the backend stubs them out automatically on non-Pi.
+fastapi
+uvicorn[standard]
+pyyaml
+python-dateutil
+websockets
+paho-mqtt
+python-dotenv
