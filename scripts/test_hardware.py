@@ -4,15 +4,17 @@ Hardware interface test script for the alarm clock Pi build.
 Tests all seven hardware components and reports PASS/FAIL for each.
 Run from the project root with the venv active:
 
-    sudo /home/pi/alarm-clock/venv/bin/python scripts/test_hardware.py
+    sudo venv/bin/python scripts/test_hardware.py
+
+Requires pigpiod to be running (sudo systemctl start pigpiod).
 
 Options:
     --leds N                Number of WS2812B LEDs in your strip (default: 6)
     --test NAME[,NAME...]   Run only specific tests (comma-separated)
                             Valid names: i2c, bh1750, ds3231, dht22, buzzer, leds, snooze, audio
+    --repeat                Run a single test in a continuous loop until Ctrl+C
 
-Note: the buzzer, LED strip, and ws281x PWM tests may require sudo unless
-the Part 8.2 udev rules are already applied.
+Aliases: light/test_light=bh1750, time/test_time=ds3231, temp=dht22, button=snooze, led=leds
 """
 
 import argparse
@@ -34,9 +36,9 @@ IS_PI = platform.machine().lower().startswith(("arm", "aarch"))
 # ---------------------------------------------------------------------------
 
 PIN_SNOOZE     = 17
-PIN_BUZZER     = 13
+PIN_BUZZER     = 13       # hardware PWM1 (DMA)
 PIN_DHT22      = 4
-PIN_LED        = 12
+PIN_LED        = 12       # hardware PWM0 (DMA, used by rpi_ws281x)
 
 I2C_BH1750     = 0x23
 I2C_DS3231     = 0x68
@@ -47,8 +49,8 @@ LED_INVERT     = False
 LED_CHANNEL    = 0
 LED_BRIGHTNESS = 64        # ~25% — visible without being blinding
 
-BUZZ_FREQ      = 880       # Hz (A5)
-BUZZ_DUTY      = 50        # PWM duty cycle %
+BUZZ_FREQ      = 880       # Hz (A5) — hardware PWM via pigpio DMA
+BUZZ_DUTY      = 50        # PWM duty cycle % (0–100); pigpio uses 0–1,000,000
 
 SNOOZE_TIMEOUT  = 10       # seconds to wait for button press
 DHT_RETRIES     = 5
@@ -56,13 +58,14 @@ DHT_RETRY_DELAY = 2        # seconds between DHT22 attempts
 RTC_DRIFT_WARN  = 60       # seconds — emit warning above this threshold
 
 # ---------------------------------------------------------------------------
-# Module-level state for cleanup (set inside test functions)
+# Module-level state for cleanup (set inside test/loop functions)
 # ---------------------------------------------------------------------------
 
-_buzzer_pwm  = None   # RPi.GPIO PWM — must be stopped before GPIO.cleanup()
-_dht_device  = None   # adafruit_dht — must call .exit() to release gpiod handle
-_strip       = None   # rpi_ws281x PixelStrip — clear pixels before GPIO.cleanup()
-_num_leds    = 6      # set from --leds arg in main()
+_pi      = None   # pigpio.pi() — must call .stop() to release DMA resources
+_button  = None   # gpiozero.Button — must call .close()
+_dht_device = None   # adafruit_dht — must call .exit() to release gpiod handle
+_strip   = None   # rpi_ws281x PixelStrip — clear pixels before stopping
+_num_leds = 6     # set from --leds arg in main()
 
 # ---------------------------------------------------------------------------
 # Results tracking
@@ -94,17 +97,26 @@ def _ask(question: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def cleanup() -> None:
-    global _buzzer_pwm, _dht_device, _strip
+    global _pi, _button, _dht_device, _strip
 
-    # 1. Stop buzzer PWM before GPIO.cleanup() to avoid segfault
-    if _buzzer_pwm is not None:
+    # 1. Stop buzzer and release pigpio DMA resources
+    if _pi is not None:
         try:
-            _buzzer_pwm.stop()
+            _pi.hardware_PWM(PIN_BUZZER, 0, 0)
+            _pi.stop()
         except Exception:
             pass
-        _buzzer_pwm = None
+        _pi = None
 
-    # 2. Clear LED strip so it doesn't freeze on last colour
+    # 2. Close gpiozero button (releases pigpio pin)
+    if _button is not None:
+        try:
+            _button.close()
+        except Exception:
+            pass
+        _button = None
+
+    # 3. Clear LED strip so it doesn't freeze on last colour
     if _strip is not None:
         try:
             from rpi_ws281x import Color
@@ -115,20 +127,13 @@ def cleanup() -> None:
             pass
         _strip = None
 
-    # 3. Release DHT22 gpiod file handle
+    # 4. Release DHT22 gpiod file handle
     if _dht_device is not None:
         try:
             _dht_device.exit()
         except Exception:
             pass
         _dht_device = None
-
-    # 4. Release all GPIO channels
-    try:
-        import RPi.GPIO as GPIO
-        GPIO.cleanup()
-    except Exception:
-        pass
 
 
 # ---------------------------------------------------------------------------
@@ -179,9 +184,7 @@ def test_i2c() -> None:
 def test_bh1750() -> None:
     i2c = None
     try:
-        import board
-        import busio
-        import adafruit_bh1750
+        import board, busio, adafruit_bh1750
         i2c = busio.I2C(board.SCL, board.SDA)
         sensor = adafruit_bh1750.BH1750(i2c)
         lux = sensor.lux
@@ -202,8 +205,8 @@ def test_ds3231() -> None:
     # The kernel owns the DS3231 via the i2c-rtc overlay (shows as UU in i2cdetect).
     # Read through the kernel sysfs RTC interface instead of directly via I2C.
     try:
-        rtc_date = open("/sys/class/rtc/rtc0/date").read().strip()   # YYYY-MM-DD
-        rtc_time = open("/sys/class/rtc/rtc0/time").read().strip()   # HH:MM:SS
+        rtc_date = open("/sys/class/rtc/rtc0/date").read().strip()
+        rtc_time = open("/sys/class/rtc/rtc0/time").read().strip()
         rtc_dt = datetime.strptime(f"{rtc_date} {rtc_time}", "%Y-%m-%d %H:%M:%S")
         sys_dt = datetime.now(timezone.utc).replace(tzinfo=None)
         diff = (rtc_dt - sys_dt).total_seconds()
@@ -220,12 +223,10 @@ def test_ds3231() -> None:
 def test_dht22() -> None:
     global _dht_device
     try:
-        import board
-        import adafruit_dht
+        import board, adafruit_dht
     except ImportError as e:
         record("dht22", FAIL, f"missing library: {e}")
         return
-
     try:
         board_pin = getattr(board, f"D{PIN_DHT22}")
         _dht_device = adafruit_dht.DHT22(board_pin)
@@ -257,24 +258,24 @@ def test_dht22() -> None:
 
 
 def test_buzzer() -> None:
-    global _buzzer_pwm
+    global _pi
     try:
-        import RPi.GPIO as GPIO
+        import pigpio
     except ImportError as e:
         record("buzzer", FAIL, f"missing library: {e}")
         return
-
     try:
-        GPIO.setwarnings(False)
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(PIN_BUZZER, GPIO.OUT)
-        _buzzer_pwm = GPIO.PWM(PIN_BUZZER, BUZZ_FREQ)
-        print(f"  Playing {BUZZ_FREQ}Hz tone for 3 seconds...")
-        _buzzer_pwm.start(BUZZ_DUTY)
+        _pi = pigpio.pi()
+        if not _pi.connected:
+            record("buzzer", FAIL, "pigpiod not running — sudo systemctl start pigpiod")
+            _pi = None
+            return
+        print(f"  Playing {BUZZ_FREQ}Hz tone via hardware PWM for 3 seconds...")
+        _pi.hardware_PWM(PIN_BUZZER, BUZZ_FREQ, BUZZ_DUTY * 10_000)
         time.sleep(3)
-        _buzzer_pwm.stop()
-        _buzzer_pwm = None
-        GPIO.cleanup(PIN_BUZZER)
+        _pi.hardware_PWM(PIN_BUZZER, 0, 0)
+        _pi.stop()
+        _pi = None
         passed = _ask("Did you hear the buzzer?")
         record("buzzer", PASS if passed else FAIL, "User confirmed" if passed else "User did not confirm")
     except Exception as e:
@@ -288,16 +289,14 @@ def test_leds() -> None:
     except ImportError as e:
         record("leds", FAIL, f"missing library: {e}")
         return
-
     try:
         _strip = PixelStrip(_num_leds, PIN_LED, LED_FREQ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
         try:
             _strip.begin()
         except PermissionError:
-            record("leds", FAIL, "PermissionError — run with sudo or apply Part 8.2 udev rules")
+            record("leds", FAIL, "PermissionError — run with sudo")
             _strip = None
             return
-
         colours = [
             ("Red",   Color(255, 0, 0)),
             ("Green", Color(0, 255, 0)),
@@ -309,11 +308,9 @@ def test_leds() -> None:
                 _strip.setPixelColor(i, colour)
             _strip.show()
             time.sleep(2)
-
         for i in range(_num_leds):
             _strip.setPixelColor(i, Color(0, 0, 0))
         _strip.show()
-
         passed = _ask("Did you see red, green, and blue on the LED strip?")
         record("leds", PASS if passed else FAIL, "User confirmed" if passed else "User did not confirm")
     except Exception as e:
@@ -321,27 +318,26 @@ def test_leds() -> None:
 
 
 def test_snooze() -> None:
+    global _button
     try:
-        import RPi.GPIO as GPIO
+        import threading
+        from gpiozero import Button
+        from gpiozero.pins.pigpio import PiGPIOFactory
     except ImportError as e:
         record("snooze", FAIL, f"missing library: {e}")
         return
-
     try:
-        GPIO.setwarnings(False)
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(PIN_SNOOZE, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        print(f"  Press the snooze button within {SNOOZE_TIMEOUT} seconds...")
+        factory = PiGPIOFactory()
+        _button = Button(PIN_SNOOZE, pull_up=True, bounce_time=0.3, pin_factory=factory)
+        pressed_event = threading.Event()
         start = time.time()
-        pressed = False
-        while time.time() - start < SNOOZE_TIMEOUT:
-            if GPIO.input(PIN_SNOOZE) == GPIO.LOW:
-                pressed = True
-                break
-            time.sleep(0.05)
-        GPIO.cleanup(PIN_SNOOZE)
+        _button.when_pressed = lambda: pressed_event.set()
+        print(f"  Press the snooze button within {SNOOZE_TIMEOUT} seconds...")
+        pressed_event.wait(timeout=SNOOZE_TIMEOUT)
+        _button.close()
+        _button = None
         elapsed = time.time() - start
-        if pressed:
+        if pressed_event.is_set():
             record("snooze", PASS, f"pressed in {elapsed:.1f}s")
         else:
             record("snooze", FAIL, f"timeout — not pressed within {SNOOZE_TIMEOUT}s")
@@ -351,10 +347,7 @@ def test_snooze() -> None:
 
 def test_audio() -> None:
     try:
-        result = subprocess.run(
-            ["aplay", "-l"],
-            capture_output=True, text=True, timeout=10,
-        )
+        result = subprocess.run(["aplay", "-l"], capture_output=True, text=True, timeout=10)
         output = result.stdout
         detected = any(kw in output.lower() for kw in ("hifiberry", "sndrpihifiberry", "dacplus"))
         for line in output.splitlines():
@@ -391,19 +384,18 @@ ALL_TESTS = [
 
 VALID_NAMES = [name for name, _ in ALL_TESTS]
 
-# Friendly name aliases — resolved to canonical names before use
 ALIASES: dict[str, str] = {
-    "light":      "bh1750",
-    "test_light": "bh1750",
-    "time":       "ds3231",
-    "test_time":  "ds3231",
-    "rtc":        "ds3231",
-    "temp":       "dht22",
-    "temperature":"dht22",
-    "button":     "snooze",
-    "led":        "leds",
-    "strip":      "leds",
-    "sound":      "buzzer",
+    "light":       "bh1750",
+    "test_light":  "bh1750",
+    "time":        "ds3231",
+    "test_time":   "ds3231",
+    "rtc":         "ds3231",
+    "temp":        "dht22",
+    "temperature": "dht22",
+    "button":      "snooze",
+    "led":         "leds",
+    "strip":       "leds",
+    "sound":       "buzzer",
 }
 
 
@@ -501,7 +493,7 @@ def loop_leds() -> None:
     try:
         strip.begin()
     except PermissionError:
-        print("  PermissionError — run with sudo or apply Part 8.2 udev rules")
+        print("  PermissionError — run with sudo")
         return
     colours = [
         ("Red",        Color(255, 0, 0)),
@@ -533,65 +525,71 @@ def loop_leds() -> None:
 
 
 def loop_snooze() -> None:
+    global _button
     try:
-        import RPi.GPIO as GPIO
+        import threading
+        from gpiozero import Button
+        from gpiozero.pins.pigpio import PiGPIOFactory
     except ImportError as e:
         print(f"  missing library: {e}")
         return
-    GPIO.setwarnings(False)
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(PIN_SNOOZE, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    print("  Snooze button — counting presses (Ctrl+C to stop)\n")
     count = 0
-    was_pressed = False
+    lock = threading.Lock()
+
+    def on_press():
+        nonlocal count
+        with lock:
+            count += 1
+            print(f"  Press #{count}")
+
+    factory = PiGPIOFactory()
+    _button = Button(PIN_SNOOZE, pull_up=True, bounce_time=0.3, pin_factory=factory)
+    _button.when_pressed = on_press
+    print("  Snooze button — counting presses (Ctrl+C to stop)\n")
     try:
         while True:
-            pressed = GPIO.input(PIN_SNOOZE) == GPIO.LOW
-            if pressed and not was_pressed:
-                count += 1
-                print(f"  Press #{count}")
-            was_pressed = pressed
-            time.sleep(0.05)
+            time.sleep(0.1)
     except KeyboardInterrupt:
         pass
     finally:
         try:
-            GPIO.cleanup(PIN_SNOOZE)
+            _button.close()
         except Exception:
             pass
+        _button = None
     print(f"\n  Total presses: {count}")
 
 
 def loop_buzzer() -> None:
+    global _pi
     try:
-        import RPi.GPIO as GPIO
+        import pigpio
     except ImportError as e:
         print(f"  missing library: {e}")
         return
-    GPIO.setwarnings(False)
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(PIN_BUZZER, GPIO.OUT)
-    pwm = GPIO.PWM(PIN_BUZZER, BUZZ_FREQ)
-    print(f"  Buzzer — {BUZZ_FREQ}Hz on/off cycle (Ctrl+C to stop)\n")
+    _pi = pigpio.pi()
+    if not _pi.connected:
+        print("  pigpiod not running — sudo systemctl start pigpiod")
+        _pi = None
+        return
+    print(f"  Buzzer — {BUZZ_FREQ}Hz hardware PWM on/off (Ctrl+C to stop)\n")
     try:
         while True:
             print("  ON")
-            pwm.start(BUZZ_DUTY)
+            _pi.hardware_PWM(PIN_BUZZER, BUZZ_FREQ, BUZZ_DUTY * 10_000)
             time.sleep(0.5)
-            pwm.stop()
+            _pi.hardware_PWM(PIN_BUZZER, 0, 0)
             print("  off")
             time.sleep(0.5)
     except KeyboardInterrupt:
         pass
     finally:
         try:
-            pwm.stop()
+            _pi.hardware_PWM(PIN_BUZZER, 0, 0)
+            _pi.stop()
         except Exception:
             pass
-        try:
-            GPIO.cleanup(PIN_BUZZER)
-        except Exception:
-            pass
+        _pi = None
 
 
 LOOP_TESTS: dict[str, callable] = {
@@ -650,7 +648,6 @@ def main() -> None:
 
     _num_leds = args.leds
 
-    # Resolve aliases and validate test names
     if args.test is not None:
         requested = [_resolve(n.strip()) for n in args.test.split(",")]
         unknown = [n for n in requested if n not in VALID_NAMES]
@@ -689,7 +686,7 @@ def main() -> None:
     print()
     print("Alarm Clock Hardware Test")
     print(f"LEDs: {_num_leds}   Tests: {', '.join(requested)}")
-    print("Stop the alarm-clock service before running if it is active.")
+    print("Requires: sudo systemctl start pigpiod")
     print()
 
     for name, _ in ALL_TESTS:

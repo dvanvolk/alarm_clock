@@ -58,10 +58,11 @@ alarm-clock/
 
 - The backend must be fully async (`asyncio`) — hardware polling, WebSocket clients, and the alarm scheduler all run as concurrent tasks under the same event loop.
 - `rpi_ws281x` (WS2812B LED control) requires root or a udev rule; plan accordingly.
-- `RPi.GPIO` and I2C libraries (`smbus2`, Adafruit CircuitPython) are hardware-specific — mock or skip on non-Pi dev machines.
-- The DS3231 RTC is a fallback time source only; `chrony` syncs NTP → system clock → DS3231.
+- GPIO is handled by `gpiozero` (snooze button edge detection) and `pigpio` (DMA hardware PWM for buzzer). `RPi.GPIO` is not used. `pigpiod` must be running on the Pi (`sudo systemctl start pigpiod`) before the service starts.
+- I2C libraries (`smbus2`, Adafruit CircuitPython) are hardware-specific — mock or skip on non-Pi dev machines.
+- The DS3231 RTC is a fallback time source only; `chrony` syncs NTP → system clock → DS3231. On Bookworm the kernel owns the DS3231 via `i2c-rtc` overlay; read it via `/sys/class/rtc/rtc0/`.
 - Home Assistant integration uses both MQTT Discovery (device registration) and the HA WebSocket API (weather entity polling, Music Assistant service calls).
-- HiFiBerry DAC+ Pro volume is controlled via ALSA — use `subprocess` to call `amixer` or use the `alsaaudio` Python library. Do not use `RPi.GPIO` for volume.
+- HiFiBerry DAC+ Pro volume is controlled via ALSA — use `subprocess` to call `amixer` or use the `alsaaudio` Python library. Do not use GPIO for volume.
 - YAML config (`config/settings.yaml`) is the single source of truth for all user settings. The settings UI writes back to it.
 
 ## Commands

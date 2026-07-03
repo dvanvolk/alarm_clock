@@ -8,7 +8,8 @@ paho-mqtt
 python-dotenv
 
 # Pi-only hardware libraries
-RPi.GPIO
+gpiozero
+pigpio
 smbus2
 adafruit-circuitpython-ds3231
 adafruit-circuitpython-bh1750
