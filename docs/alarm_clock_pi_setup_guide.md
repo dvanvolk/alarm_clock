@@ -118,7 +118,7 @@ sudo reboot
 ### 4.1 Disable the Default Audio
 
 ```bash
-sudo nano /boot/config.txt
+sudo nano /boot/firmware/config.txt
 ```
 
 Find this line and comment it out (add `#` at the start):
@@ -128,10 +128,10 @@ Find this line and comment it out (add `#` at the start):
 
 ### 4.2 Enable the HiFiBerry Overlay
 
-Add these lines at the bottom of `/boot/config.txt`:
+Add these lines at the bottom of `/boot/firmware/config.txt`:
 ```
 # HiFiBerry DAC+ Pro
-dtoverlay=hifiberry-dacplus
+dtoverlay=hifiberry-dacplus-std
 ```
 
 Save and exit (`Ctrl+X`, `Y`, `Enter`).
@@ -147,17 +147,36 @@ After reboot, verify the DAC is detected:
 aplay -l
 ```
 
-You should see something like:
+You should see two cards — HDMI and the HiFiBerry:
 ```
-card 0: sndrpihifiberry [snd_rpi_hifiberry_dacplus], device 0: HiFiBerry DAC+ Pro HiFi pcm512x-hifi-0
+card 0: vc4hdmi [vc4-hdmi], device 0: MAI PCM i2s-hifi-0 [MAI PCM i2s-hifi-0]
+card 1: sndrpihifiberry [snd_rpi_hifiberry_dacplus], device 0: HiFiBerry DAC+ HiFi pcm512x-hifi-0
 ```
 
-Test audio output:
+Test audio output on the HiFiBerry (card 1). You should hear alternating "Front Left" and "Front Right" announcements from each speaker:
 ```bash
-speaker-test -c 2 -t wav
+speaker-test -D hw:1,0 -c 2 -t wav
 ```
 
-### 4.4 Set Default Volume
+If only one speaker plays, check that both RCA cables are fully seated at the DAC+ Pro and at the speaker inputs. Swap the two cables temporarily — if the silent side follows the cable, replace that cable; if it stays on the same speaker, the speaker input is the issue.
+
+### 4.4 Set HiFiBerry as ALSA Default
+
+Without a default configured, tools and the Python backend must always specify `hw:1,0` explicitly. Set the HiFiBerry as the system default so `hw:default` works:
+
+```bash
+sudo nano /etc/asound.conf
+```
+
+Add:
+```
+defaults.pcm.card 1
+defaults.ctl.card 1
+```
+
+Save and exit. After this, `speaker-test -c 2 -t wav` (without `-D`) will use the HiFiBerry.
+
+### 4.5 Set Default Volume
 
 ```bash
 amixer sset 'Digital' 80%
@@ -192,7 +211,7 @@ Insert the CR2032 battery into the DS3231 module.
 ### 5.2 Enable the RTC Driver
 
 ```bash
-sudo nano /boot/config.txt
+sudo nano /boot/firmware/config.txt
 ```
 
 Add at the bottom:
@@ -214,38 +233,15 @@ sudo i2cdetect -y 1
 
 You should see `68` in the grid — that is the DS3231 address.
 
-### 5.4 Remove the Fake Hardware Clock
+### 5.4 Verify RTC is Working
+
+On Raspberry Pi OS Bookworm, systemd syncs the RTC automatically — no manual `hwclock` commands are needed. Confirm the RTC is visible and showing the correct time:
 
 ```bash
-sudo apt remove -y fake-hwclock
-sudo update-rc.d -f fake-hwclock remove
-sudo systemctl disable fake-hwclock
+timedatectl
 ```
 
-### 5.5 Configure hwclock
-
-```bash
-sudo nano /lib/udev/hwclock-set
-```
-
-Comment out these three lines:
-```bash
-#if [ -e /run/systemd/system ] ; then
-# exit 0
-#fi
-```
-
-### 5.6 Sync System Time to RTC
-
-Once the Pi has synced via NTP (check with `timedatectl`), write the time to the RTC:
-```bash
-sudo hwclock -w
-```
-
-Read back from RTC to verify:
-```bash
-sudo hwclock -r
-```
+Look for `RTC time:` in the output. If NTP is synced (shown as `System clock synchronized: yes`), systemd will keep the RTC updated at shutdown and read it back on boot.
 
 ---
 
@@ -404,7 +400,7 @@ sudo apt install -y \
   alsa-utils \
   chrony \
   i2c-tools \
-  libgpiod2
+  libgpiod3
 ```
 
 ### 8.2 WS2812B LED Support
@@ -472,10 +468,42 @@ pip install \
   alsaaudio
 ```
 
-> `adafruit-circuitpython-dht` requires `libgpiod2`, which is included in the
+> `adafruit-circuitpython-dht` requires `libgpiod3`, which is included in the
 > `apt install` command in Part 8.1.
 
-### 9.4 Edit the Config File
+### 9.4 Run the Hardware Test
+
+With all Python packages installed and hardware wired (Part 7), run the hardware
+test script to verify every component before configuring the application:
+
+```bash
+sudo /home/pi/alarm-clock/venv/bin/python scripts/test_hardware.py
+```
+
+The script runs automated tests first (I2C scan, BH1750, DS3231, DHT22), then
+interactive tests that ask you to confirm audio/visual output (buzzer, LEDs,
+snooze button). Each test reports PASS, FAIL, or SKIP, with a summary at the end.
+
+Options:
+```bash
+# If your LED strip has a different number of LEDs
+sudo venv/bin/python scripts/test_hardware.py --leds 12
+
+# Run a single test
+sudo venv/bin/python scripts/test_hardware.py --test bh1750
+
+# Run multiple specific tests
+sudo venv/bin/python scripts/test_hardware.py --test i2c,ds3231,dht22
+```
+
+If any test FAILs, check the wiring for that component in Part 7 and re-run
+before continuing. The alarm-clock service does not exist yet at this point,
+but if you re-run later with the service active, stop it first:
+```bash
+sudo systemctl stop alarm-clock
+```
+
+### 9.5 Edit the Config File
 
 Open `config/settings.yaml` and fill in your timezone, alarm times, Home
 Assistant URL, MQTT broker address, and DHT22 settings:
@@ -503,7 +531,7 @@ home_assistant:
 > **Do not** put your HA token or MQTT password in `settings.yaml` — use the
 > `.env` file instead (see Part 9.5 below).
 
-### 9.5 Create the Secrets File (.env)
+### 9.6 Create the Secrets File (.env)
 
 Credentials are loaded from a `.env` file that is never committed to git.
 Copy the example and fill in your values:
@@ -641,7 +669,7 @@ fi
 ### 12.1 Check Orientation
 
 The official RPi touchscreen may need rotation depending on how you mount it.
-To rotate 180 degrees, add to `/boot/config.txt`:
+To rotate 180 degrees, add to `/boot/firmware/config.txt`:
 
 ```
 display_rotate=2
@@ -781,13 +809,7 @@ aplay -l
 # Set DAC volume
 amixer sset 'Digital' 80%
 
-# Read RTC time
-sudo hwclock -r
-
-# Write system time to RTC
-sudo hwclock -w
-
-# Check NTP sync
+# Check RTC time and NTP sync status
 chronyc tracking
 
 # Check GPIO (requires pigpio or RPi.GPIO)
@@ -813,13 +835,18 @@ pkill chromium-browser
 ## Troubleshooting
 
 **No sound from DAC+ Pro**
-- Run `aplay -l` — if HiFiBerry is not listed, check `/boot/config.txt` for `dtoverlay=hifiberry-dacplus` and confirm `dtparam=audio=on` is commented out
+- Run `aplay -l` — if HiFiBerry is not listed, check `/boot/firmware/config.txt` for `dtoverlay=hifiberry-dacplus` and confirm `dtparam=audio=on` is commented out
 - Check speaker power and RCA cable connections
+
+**Only one speaker plays (left or right channel silent)**
+- Run `speaker-test -D hw:1,0 -c 2 -t wav` and listen for both "Front Left" and "Front Right" announcements
+- If one side is silent, swap both RCA cables: if the silent side follows the cable, replace that cable; if it stays on the same speaker, the speaker's input is faulty
+- Confirm `/etc/asound.conf` sets `defaults.pcm.card 1` so the backend targets the right card
 
 **RTC not detected**
 - Run `sudo i2cdetect -y 1` — if `68` is missing, check wiring on SDA/SCL pins
 - Confirm I2C is enabled in `raspi-config`
-- Confirm `dtoverlay=i2c-rtc,ds3231` is in `/boot/config.txt`
+- Confirm `dtoverlay=i2c-rtc,ds3231` is in `/boot/firmware/config.txt`
 
 **BH1750 not detected**
 - Run `sudo i2cdetect -y 1` — if `23` is missing, check ADDR pin is tied to GND
@@ -835,7 +862,7 @@ pkill chromium-browser
 - Check backend logs: `journalctl -u alarm-clock -f`
 
 **Touch input not working or wrong orientation**
-- Check `display_rotate` value in `/boot/config.txt`
+- Check `display_rotate` value in `/boot/firmware/config.txt`
 - Run `xinput_calibrator` to recalibrate
 
 **WS2812B LEDs not lighting**
@@ -850,7 +877,7 @@ pkill chromium-browser
 - Confirm the 4.7kΩ pull-up resistor is present between DATA and VCC (unless
   your module has one built in)
 - Run the one-line test command from the Useful Commands section above
-- Confirm `libgpiod2` is installed: `dpkg -l libgpiod2`
+- Confirm `libgpiod3` is installed: `dpkg -l libgpiod3`
 
 **DHT22 sensors not appearing in Home Assistant**
 - Check MQTT is connected: look for "MQTT connected" in backend logs
