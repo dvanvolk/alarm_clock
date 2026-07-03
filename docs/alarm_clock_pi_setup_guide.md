@@ -583,8 +583,8 @@ chronyc tracking
 ### 11.1 Set Up Openbox Autostart
 
 ```bash
-mkdir -p /home/pi/.config/openbox
-nano /home/pi/.config/openbox/autostart
+mkdir -p /home/dan/.config/openbox
+nano /home/dan/.config/openbox/autostart
 ```
 
 Add:
@@ -598,7 +598,7 @@ xset -dpms
 unclutter -idle 0.5 -root &
 
 # Start the alarm clock backend
-/home/pi/alarm-clock/venv/bin/python /home/pi/alarm-clock/backend/main.py &
+/home/dan/alarm-clock/venv/bin/python /home/dan/alarm-clock/backend/main.py &
 
 # Wait for backend to start
 sleep 3
@@ -630,7 +630,7 @@ Exit raspi-config.
 ### 11.3 Configure X to Start Openbox
 
 ```bash
-nano /home/pi/.xinitrc
+nano /home/dan/.xinitrc
 ```
 
 Add:
@@ -641,7 +641,7 @@ exec openbox-session
 ### 11.4 Auto-Start X on Login
 
 ```bash
-nano /home/pi/.bash_profile
+nano /home/dan/.bash_profile
 ```
 
 Add at the bottom:
@@ -685,7 +685,7 @@ sudo nano /etc/X11/xorg.conf.d/99-calibration.conf
 This ensures the alarm clock restarts automatically after a crash or reboot.
 
 ```bash
-sudo cp /home/pi/alarm-clock/systemd/alarm-clock.service /etc/systemd/system/
+sudo cp /home/dan/alarm_clock/systemd/alarm-clock.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable alarm-clock
 sudo systemctl start alarm-clock

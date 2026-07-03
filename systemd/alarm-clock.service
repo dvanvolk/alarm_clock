@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/alarm-clock
-ExecStart=/home/pi/alarm-clock/venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
+User=dan
+WorkingDirectory=/home/dan/alarm_clock
+ExecStart=/home/dan/alarm_clock/venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=5
 StandardOutput=journal
