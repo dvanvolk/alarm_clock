@@ -21,7 +21,7 @@ import platform
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ---------------------------------------------------------------------------
 # Platform detection
@@ -205,7 +205,7 @@ def test_ds3231() -> None:
         rtc_date = open("/sys/class/rtc/rtc0/date").read().strip()   # YYYY-MM-DD
         rtc_time = open("/sys/class/rtc/rtc0/time").read().strip()   # HH:MM:SS
         rtc_dt = datetime.strptime(f"{rtc_date} {rtc_time}", "%Y-%m-%d %H:%M:%S")
-        sys_dt = datetime.utcnow()
+        sys_dt = datetime.now(timezone.utc).replace(tzinfo=None)
         diff = (rtc_dt - sys_dt).total_seconds()
         detail = f"RTC={rtc_dt.strftime('%Y-%m-%d %H:%M:%S')}  sys-diff={diff:+.0f}s"
         if abs(diff) > RTC_DRIFT_WARN:
@@ -391,6 +391,218 @@ ALL_TESTS = [
 
 VALID_NAMES = [name for name, _ in ALL_TESTS]
 
+# Friendly name aliases — resolved to canonical names before use
+ALIASES: dict[str, str] = {
+    "light":      "bh1750",
+    "test_light": "bh1750",
+    "time":       "ds3231",
+    "test_time":  "ds3231",
+    "rtc":        "ds3231",
+    "temp":       "dht22",
+    "temperature":"dht22",
+    "button":     "snooze",
+    "led":        "leds",
+    "strip":      "leds",
+    "sound":      "buzzer",
+}
+
+
+def _resolve(name: str) -> str:
+    return ALIASES.get(name, name)
+
+
+# ---------------------------------------------------------------------------
+# Repeat / loop functions (run until Ctrl+C)
+# ---------------------------------------------------------------------------
+
+def loop_bh1750() -> None:
+    try:
+        import board, busio, adafruit_bh1750
+    except ImportError as e:
+        print(f"  missing library: {e}")
+        return
+    i2c = busio.I2C(board.SCL, board.SDA)
+    sensor = adafruit_bh1750.BH1750(i2c)
+    print("  BH1750 light sensor — reading every 1s (Ctrl+C to stop)\n")
+    count = 0
+    try:
+        while True:
+            lux = sensor.lux
+            count += 1
+            bar = "█" * min(int(lux / 10), 40)
+            print(f"  {count:4d}  {lux:7.1f} lux  {bar}")
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            i2c.deinit()
+        except Exception:
+            pass
+
+
+def loop_ds3231() -> None:
+    print("  DS3231 RTC — reading every 1s (Ctrl+C to stop)\n")
+    count = 0
+    try:
+        while True:
+            rtc_date = open("/sys/class/rtc/rtc0/date").read().strip()
+            rtc_time_str = open("/sys/class/rtc/rtc0/time").read().strip()
+            sys_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+            rtc_dt = datetime.strptime(f"{rtc_date} {rtc_time_str}", "%Y-%m-%d %H:%M:%S")
+            diff = (rtc_dt - sys_dt).total_seconds()
+            count += 1
+            print(f"  {count:4d}  RTC {rtc_date} {rtc_time_str}  sys-diff={diff:+.0f}s")
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+
+
+def loop_dht22() -> None:
+    try:
+        import board, adafruit_dht
+    except ImportError as e:
+        print(f"  missing library: {e}")
+        return
+    board_pin = getattr(board, f"D{PIN_DHT22}")
+    dht = adafruit_dht.DHT22(board_pin)
+    print("  DHT22 — reading every 3s (Ctrl+C to stop)\n")
+    count = 0
+    try:
+        while True:
+            try:
+                temp_c = dht.temperature
+                humidity = dht.humidity
+                if temp_c is not None and humidity is not None:
+                    temp_f = temp_c * 9 / 5 + 32
+                    count += 1
+                    print(f"  {count:4d}  {temp_f:.1f}°F ({temp_c:.1f}°C)  {humidity:.1f}%RH")
+                else:
+                    print("  ----  read returned None, retrying...")
+            except RuntimeError:
+                print("  ----  read error, retrying...")
+            time.sleep(3)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            dht.exit()
+        except Exception:
+            pass
+
+
+def loop_leds() -> None:
+    try:
+        from rpi_ws281x import PixelStrip, Color
+    except ImportError as e:
+        print(f"  missing library: {e}")
+        return
+    strip = PixelStrip(_num_leds, PIN_LED, LED_FREQ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
+    try:
+        strip.begin()
+    except PermissionError:
+        print("  PermissionError — run with sudo or apply Part 8.2 udev rules")
+        return
+    colours = [
+        ("Red",        Color(255, 0, 0)),
+        ("Green",      Color(0, 255, 0)),
+        ("Blue",       Color(0, 0, 255)),
+        ("Warm white", Color(255, 230, 100)),
+        ("Off",        Color(0, 0, 0)),
+    ]
+    print("  WS2812B — cycling colours (Ctrl+C to stop)\n")
+    idx = 0
+    try:
+        while True:
+            name, colour = colours[idx % len(colours)]
+            print(f"  {name}")
+            for i in range(_num_leds):
+                strip.setPixelColor(i, colour)
+            strip.show()
+            time.sleep(2)
+            idx += 1
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            for i in range(_num_leds):
+                strip.setPixelColor(i, Color(0, 0, 0))
+            strip.show()
+        except Exception:
+            pass
+
+
+def loop_snooze() -> None:
+    try:
+        import RPi.GPIO as GPIO
+    except ImportError as e:
+        print(f"  missing library: {e}")
+        return
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(PIN_SNOOZE, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    print("  Snooze button — counting presses (Ctrl+C to stop)\n")
+    count = 0
+    was_pressed = False
+    try:
+        while True:
+            pressed = GPIO.input(PIN_SNOOZE) == GPIO.LOW
+            if pressed and not was_pressed:
+                count += 1
+                print(f"  Press #{count}")
+            was_pressed = pressed
+            time.sleep(0.05)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            GPIO.cleanup(PIN_SNOOZE)
+        except Exception:
+            pass
+    print(f"\n  Total presses: {count}")
+
+
+def loop_buzzer() -> None:
+    try:
+        import RPi.GPIO as GPIO
+    except ImportError as e:
+        print(f"  missing library: {e}")
+        return
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(PIN_BUZZER, GPIO.OUT)
+    pwm = GPIO.PWM(PIN_BUZZER, BUZZ_FREQ)
+    print(f"  Buzzer — {BUZZ_FREQ}Hz on/off cycle (Ctrl+C to stop)\n")
+    try:
+        while True:
+            print("  ON")
+            pwm.start(BUZZ_DUTY)
+            time.sleep(0.5)
+            pwm.stop()
+            print("  off")
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            pwm.stop()
+        except Exception:
+            pass
+        try:
+            GPIO.cleanup(PIN_BUZZER)
+        except Exception:
+            pass
+
+
+LOOP_TESTS: dict[str, callable] = {
+    "bh1750": loop_bh1750,
+    "ds3231": loop_ds3231,
+    "dht22":  loop_dht22,
+    "leds":   loop_leds,
+    "snooze": loop_snooze,
+    "buzzer": loop_buzzer,
+}
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
@@ -422,22 +634,30 @@ def print_summary() -> None:
 def main() -> None:
     global _num_leds
 
-    parser = argparse.ArgumentParser(description="Alarm clock hardware interface tests")
+    alias_hint = "  Aliases: light/test_light=bh1750, time/test_time=ds3231, temp=dht22, button=snooze, led=leds"
+    parser = argparse.ArgumentParser(
+        description="Alarm clock hardware interface tests",
+        epilog=alias_hint,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--leds", type=int, default=6, metavar="N",
                         help="Number of WS2812B LEDs in the strip (default: 6)")
     parser.add_argument("--test", type=str, default=None, metavar="NAMES",
                         help=f"Comma-separated tests to run. Valid: {', '.join(VALID_NAMES)}")
+    parser.add_argument("--repeat", action="store_true",
+                        help="Run a single test in a continuous loop until Ctrl+C")
     args = parser.parse_args()
 
     _num_leds = args.leds
 
-    # Resolve which tests to run
+    # Resolve aliases and validate test names
     if args.test is not None:
-        requested = [n.strip() for n in args.test.split(",")]
+        requested = [_resolve(n.strip()) for n in args.test.split(",")]
         unknown = [n for n in requested if n not in VALID_NAMES]
         if unknown:
             print(f"Unknown test(s): {', '.join(unknown)}")
             print(f"Valid names: {', '.join(VALID_NAMES)}")
+            print(alias_hint)
             sys.exit(1)
     else:
         requested = VALID_NAMES
@@ -449,13 +669,29 @@ def main() -> None:
         print_summary()
         sys.exit(0)
 
+    # --- Repeat mode ---
+    if args.repeat:
+        if len(requested) != 1:
+            print("--repeat requires exactly one test (e.g. --test light --repeat)")
+            sys.exit(1)
+        name = requested[0]
+        if name not in LOOP_TESTS:
+            print(f"--repeat is not supported for '{name}'")
+            sys.exit(1)
+        print(f"\nRepeat mode: {name} (Ctrl+C to stop)")
+        try:
+            LOOP_TESTS[name]()
+        finally:
+            cleanup()
+        sys.exit(0)
+
+    # --- Normal single-run mode ---
     print()
     print("Alarm Clock Hardware Test")
     print(f"LEDs: {_num_leds}   Tests: {', '.join(requested)}")
     print("Stop the alarm-clock service before running if it is active.")
     print()
 
-    # Mark skipped tests up front so they appear in the summary
     for name, _ in ALL_TESTS:
         if name not in requested:
             record(name, SKIP, "not selected")
