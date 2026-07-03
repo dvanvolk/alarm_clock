@@ -398,6 +398,7 @@ sudo apt install -y \
   xinit \
   xserver-xorg \
   alsa-utils \
+  libasound2-dev \
   chrony \
   i2c-tools \
   libgpiod3

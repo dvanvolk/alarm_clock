@@ -22,6 +22,21 @@ async def run_ota(manager, branch: str = "main") -> None:
         if result.returncode == 0:
             log.info("git pull succeeded: %s", result.stdout.strip())
             await manager.broadcast({"type": "ota_status", "status": "success", "detail": result.stdout.strip()})
+
+            await manager.broadcast({"type": "ota_status", "status": "installing"})
+            pip = await asyncio.to_thread(
+                subprocess.run,
+                [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if pip.returncode != 0:
+                log.error("pip install failed: %s", pip.stderr.strip())
+                await manager.broadcast({"type": "ota_status", "status": "error", "detail": pip.stderr.strip()})
+                return
+
+            log.info("pip install succeeded")
             await manager.broadcast({"type": "ota_status", "status": "restarting"})
             await asyncio.sleep(2)
             sys.exit(0)
