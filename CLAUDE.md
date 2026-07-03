@@ -15,11 +15,12 @@ Two-layer design communicating over a local WebSocket:
 
 All frontend ↔ backend communication is WebSocket only. Python pushes state (time, brightness, weather, alarm state); the browser sends actions (`snooze`, `dismiss`, `settings_save`, `ota_trigger`, `switch_view`).
 
-## Planned Project Structure
+## Project Structure
 
 ```
 alarm-clock/
 ├── backend/
+│   ├── __init__.py
 │   ├── main.py        # FastAPI app, WebSocket server, startup, asyncio task orchestration
 │   ├── alarm.py       # Alarm scheduling, firing, snooze, Music Assistant trigger
 │   ├── hardware.py    # GPIO (snooze button, buzzer PWM), I2C (DS3231 RTC, BH1750 light sensor), DHT22
@@ -38,7 +39,13 @@ alarm-clock/
 │       ├── weather.js  # Weather widget
 │       └── settings.js # Settings form
 ├── config/settings.yaml  # All user-configurable settings (see docs for schema)
-└── systemd/alarm-clock.service
+├── docs/
+│   ├── alarm_clock_architecture.md
+│   ├── alarm_clock_pi_setup_guide.md
+│   └── alarm_clock_requirements.md
+├── systemd/alarm-clock.service
+├── requirements.txt
+└── .env.example
 ```
 
 ## Runtime Environment
@@ -57,7 +64,7 @@ alarm-clock/
 - HiFiBerry DAC+ Pro volume is controlled via ALSA — use `subprocess` to call `amixer` or use the `alsaaudio` Python library. Do not use `RPi.GPIO` for volume.
 - YAML config (`config/settings.yaml`) is the single source of truth for all user settings. The settings UI writes back to it.
 
-## Commands (once code exists)
+## Commands
 
 ```bash
 # Run backend (dev)

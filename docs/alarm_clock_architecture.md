@@ -232,13 +232,14 @@ IDLE → SUNRISE (if enabled, ramp_minutes before alarm time)
 ```
 alarm-clock/
 ├── backend/
+│   ├── __init__.py
 │   ├── main.py              # FastAPI app, WebSocket server, startup
 │   ├── alarm.py             # Alarm scheduling and firing logic
-│   ├── hardware.py          # GPIO, buzzer, light sensor, RTC
-│   ├── leds.py              # Sunrise LED effect
-│   ├── ha_client.py         # Home Assistant API integration
+│   ├── hardware.py          # GPIO, buzzer, light sensor, RTC, DHT22
+│   ├── leds.py              # Sunrise LED effect (WS2812B)
+│   ├── ha_client.py         # Home Assistant API + MQTT Discovery integration
 │   ├── config.py            # Load/save YAML config
-│   └── updater.py           # OTA git pull logic
+│   └── updater.py           # OTA git pull + systemd restart
 ├── frontend/
 │   ├── index.html           # Main clock face
 │   ├── settings.html        # Settings screen
@@ -252,8 +253,14 @@ alarm-clock/
 │       └── settings.js      # Settings form logic
 ├── config/
 │   └── settings.yaml        # All user-configurable settings
+├── docs/
+│   ├── alarm_clock_architecture.md
+│   ├── alarm_clock_pi_setup_guide.md
+│   └── alarm_clock_requirements.md
 ├── systemd/
 │   └── alarm-clock.service  # systemd unit file
+├── requirements.txt
+├── .env.example
 └── README.md
 ```
 
