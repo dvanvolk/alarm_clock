@@ -2,8 +2,9 @@
 
 import asyncio
 import logging
+import os
+import signal
 import subprocess
-import sys
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ async def run_ota(manager, branch: str = "main") -> None:
             log.info("pip install succeeded")
             await manager.broadcast({"type": "ota_status", "status": "restarting"})
             await asyncio.sleep(2)
-            sys.exit(0)
+            os.kill(os.getpid(), signal.SIGTERM)
         else:
             log.error("git pull failed: %s", result.stderr.strip())
             await manager.broadcast({"type": "ota_status", "status": "error", "detail": result.stderr.strip()})
