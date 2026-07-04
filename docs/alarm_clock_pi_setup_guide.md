@@ -401,7 +401,9 @@ sudo apt install -y \
   libasound2-dev \
   chrony \
   i2c-tools \
-  libgpiod3
+  libgpiod3 \
+  liblgpio-dev \
+  swig
 ```
 
 ### 8.2 WS2812B LED Support
@@ -597,13 +599,8 @@ xset -dpms
 # Hide the cursor when idle
 unclutter -idle 0.5 -root &
 
-# Start the alarm clock backend
-/home/dan/alarm-clock/venv/bin/python /home/dan/alarm-clock/backend/main.py &
-
-# Wait for backend to start
-sleep 3
-
 # Launch Chromium in kiosk mode
+# (the backend is started by systemd before the desktop session — no sleep needed)
 chromium-browser \
   --kiosk \
   --noerrdialogs \
@@ -701,9 +698,9 @@ View live logs:
 journalctl -u alarm-clock -f
 ```
 
-> **Note:** If using the Openbox autostart method (Part 11), you may run the
-> backend directly from autostart rather than systemd. Choose one approach —
-> systemd is more robust and recommended for production.
+> **Note:** The backend runs as a systemd service and starts before the desktop
+> session. Do not also start it from Openbox autostart — that would launch a
+> second instance and cause port conflicts.
 
 ---
 

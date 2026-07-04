@@ -161,6 +161,6 @@ def setup_snooze_button(callback: Callable) -> None:
     if not IS_PI:
         log.info("[STUB] Snooze button not wired (not on Pi)")
         return
-    _button = Button(PIN_SNOOZE, pull_up=True, bounce_time=0.3)
+    _button = Button(PIN_SNOOZE, pull_up=True, bounce_time=0.05)
     _button.when_pressed = callback
     log.info("Snooze button ready on GPIO%d (gpiozero/lgpio)", PIN_SNOOZE)
