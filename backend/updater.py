@@ -5,6 +5,7 @@ import logging
 import os
 import signal
 import subprocess
+import sys
 
 log = logging.getLogger(__name__)
 
