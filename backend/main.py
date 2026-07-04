@@ -83,7 +83,7 @@ async def tick_loop():
 
 
 async def hardware_poll_loop():
-    """Poll light sensor every 60 s and push brightness_update."""
+    """Poll light sensor every 30 s and push brightness_update."""
     display_cfg = config.get("display", {})
     lux_low = display_cfg.get("dim_low_lux", 20)
     lux_high = display_cfg.get("dim_high_lux", 300)
@@ -95,8 +95,9 @@ async def hardware_poll_loop():
         if auto_dim:
             lux = hw.get_lux()
             pct = br_min + (br_max - br_min) * min(max((lux - lux_low) / (lux_high - lux_low), 0), 1)
+            log.info("BH1750: %.1f lux → brightness %d%%", lux, round(pct))
             await manager.broadcast({"type": "brightness_update", "brightness": round(pct)})
-        await asyncio.sleep(60)
+        await asyncio.sleep(30)
 
 
 async def alarm_check_loop():

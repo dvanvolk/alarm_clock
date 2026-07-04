@@ -601,7 +601,7 @@ unclutter -idle 0.5 -root &
 
 # Launch Chromium in kiosk mode
 # (the backend is started by systemd before the desktop session — no sleep needed)
-chromium-browser \
+chromium \
   --kiosk \
   --noerrdialogs \
   --disable-infobars \
@@ -614,15 +614,31 @@ chromium-browser \
 
 Save and exit.
 
-### 11.2 Configure Auto-Login to Desktop
+### 11.2 Configure Console Auto-Login
 
+**Step 1 — Switch to console boot:**
 ```bash
 sudo raspi-config
 ```
 
-Navigate to: **1 System Options** → **S5 Boot / Auto Login** → **B4 Desktop Autologin**
+Navigate to: **1 System Options** → **S5 Boot / Auto Login** → **B1 Console**
 
-Exit raspi-config.
+Exit raspi-config (do NOT reboot yet).
+
+**Step 2 — Enable autologin for your user on TTY1:**
+```bash
+sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
+sudo nano /etc/systemd/system/getty@tty1.service.d/autologin.conf
+```
+
+Add (replace `dan` with your username if different):
+```ini
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin dan --noclear %I $TERM
+```
+
+Save and exit. Now reboot — the Pi will auto-login to a console session, which triggers `.bash_profile` → `startx` → Openbox → Chromium kiosk.
 
 ### 11.3 Configure X to Start Openbox
 
@@ -813,7 +829,7 @@ dht.exit()
 echo 150 | sudo tee /sys/class/backlight/rpi_backlight/brightness
 
 # Restart kiosk (kill Chromium and let autostart relaunch)
-pkill chromium-browser
+pkill chromium
 ```
 
 ---
@@ -838,9 +854,12 @@ pkill chromium-browser
 - Run `sudo i2cdetect -y 1` — if `23` is missing, check ADDR pin is tied to GND
 - Both DS3231 and BH1750 share I2C — both should appear at the same time
 
-**Kiosk doesn't start**
+**Kiosk doesn't start / Pi shows full desktop**
+- Confirm boot mode: `systemctl get-default` should return `multi-user.target`, not `graphical.target`
+- If it returns `graphical.target`, run raspi-config → System Options → Boot/Auto Login → **B1 Console**, then create `/etc/systemd/system/getty@tty1.service.d/autologin.conf` (see Part 11.2)
+- Check `~/.bash_profile` contains the `startx` block and `~/.xinitrc` contains `exec openbox-session`
 - Check `~/.config/openbox/autostart` syntax
-- Run `startx` manually from SSH to see X error output
+- Run `startx` manually from an SSH session to see X error output
 - Check backend is running: `sudo systemctl status alarm-clock`
 
 **Chromium shows "connection refused"**

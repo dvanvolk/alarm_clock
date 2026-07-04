@@ -8,7 +8,7 @@ clock:
 
 display:
   auto_dim: true
-  dim_min_brightness: 10   # % brightness floor at night
+  dim_min_brightness: 30   # % brightness floor at night
   dim_max_brightness: 100  # % brightness ceiling in daylight
   dim_low_lux: 20          # lux threshold to start dimming
   dim_high_lux: 300        # lux threshold for full brightness
@@ -69,5 +69,5 @@ home_assistant:
   music_player_entity: ""      # e.g. "media_player.alarm_clock"
 
 ota:
-  git_branch: "main"
+  git_branch: "master"
   auto_check: false
