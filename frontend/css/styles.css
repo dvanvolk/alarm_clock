@@ -179,6 +179,18 @@ html, body {
 }
 #btn-settings:hover { color: var(--accent); }
 
+#btn-dashboard {
+  position: fixed;
+  top: 10px;
+  right: 14px;
+  font-size: 1.4rem;
+  color: #333;
+  text-decoration: none;
+  transition: color 0.2s;
+  line-height: 1;
+}
+#btn-dashboard:hover { color: var(--accent); }
+
 .ota-status-error { color: #f66; }
 .ota-status-success { color: #6f6; }
 .ota-status-restarting { color: #fa0; }
