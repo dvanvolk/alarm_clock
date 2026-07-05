@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
-from backend.config import load_config, save_config
+from backend.config import load_config, save_config, load_alarms, save_alarms
 from backend.alarm import AlarmScheduler
 from backend.ha_client import HAClient
 import backend.hardware as hw
@@ -130,6 +130,7 @@ async def dht22_poll_loop():
 async def lifespan(app: FastAPI):
     global config, scheduler, ha_client
     config = load_config()
+    config["alarms"] = load_alarms()
     hw.setup_hardware(config)
     sunrise_cfg = config.get("sunrise", {})
     leds.setup_leds(
@@ -227,9 +228,17 @@ async def handle_message(msg: dict, ws: WebSocket):
         dashboard_url = new_cfg.pop("dashboard_url", None)
         if dashboard_url is not None:
             config.setdefault("home_assistant", {})["dashboard_url"] = dashboard_url
-        config.update(new_cfg)
-        save_config(config)
+            save_config(config)
+        if "alarms" in new_cfg:
+            config["alarms"] = new_cfg["alarms"]
+            save_alarms(config["alarms"])
         scheduler.reload(config)
+        await manager.broadcast({
+            "type": "config_update",
+            "alarms": config.get("alarms", []),
+            "buzzer": config.get("buzzer", {}),
+            "dashboard_url": config.get("home_assistant", {}).get("dashboard_url", ""),
+        })
         log.info("Settings saved")
 
     elif mtype == "switch_view":

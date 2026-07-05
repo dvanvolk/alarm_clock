@@ -25,6 +25,9 @@ env/
 # Secrets / local config overrides
 config/secrets.yaml
 
+# User alarm data — preserved across OTA updates
+config/alarms.yaml
+
 # Logs
 *.log
 

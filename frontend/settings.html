@@ -229,6 +229,69 @@
     #save-status.ok { color: #6c6; }
     #save-status.err { color: #f66; }
 
+    /* Alarm list header with Add button */
+    #alarm-list-header {
+      display: flex;
+      align-items: center;
+      padding: 16px 20px 0;
+      gap: 12px;
+    }
+
+    #alarm-list-header .section-header {
+      flex: 1;
+      padding: 0;
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+
+    #btn-add-alarm {
+      font-family: 'Exo 2', sans-serif;
+      font-size: 0.8rem;
+      padding: 6px 14px;
+      border: 1px solid #444;
+      background: transparent;
+      color: var(--dim);
+      cursor: pointer;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    #btn-add-alarm:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Delete alarm button */
+    .btn-delete-alarm {
+      margin-left: auto;
+      background: transparent;
+      border: none;
+      color: #555;
+      font-size: 1rem;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    .btn-delete-alarm:hover { color: #f66; }
+
+    /* Number inputs in alarm cards */
+    .alarm-number-input {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: var(--text);
+      font-family: 'Exo 2', sans-serif;
+      font-size: 0.95rem;
+      padding: 4px 8px;
+      width: 60px;
+      outline: none;
+      text-align: center;
+    }
+    .alarm-number-input:focus { border-color: var(--accent); }
+
+    .card-unit {
+      color: var(--dim);
+      font-size: 0.8rem;
+    }
+
     /* General settings section */
     #general-settings {
       padding: 0 20px 20px;
@@ -283,8 +346,13 @@
     <div id="ws-status" title="WebSocket status"></div>
   </div>
 
+  <div id="alarm-list-header">
+    <div class="section-header">Alarms</div>
+    <button id="btn-add-alarm" onclick="addAlarm()">+ Add Alarm</button>
+  </div>
+
   <div id="alarm-list">
-    <p style="color:var(--dim);font-size:0.85rem;">Connecting…</p>
+    <p style="color:var(--dim);font-size:0.85rem;padding:20px;">Connecting…</p>
   </div>
 
   <div id="general-settings">

@@ -13,21 +13,6 @@ display:
   dim_low_lux: 20          # lux threshold to start dimming
   dim_high_lux: 300        # lux threshold for full brightness
 
-alarms:
-  - label: "Weekdays"
-    time: "06:30"
-    days: [mon, tue, wed, thu, fri]
-    enabled: true
-    sound: music_assistant
-    music_uri: "media-source://music_assistant/playlist/morning"
-  - label: "Weekends"
-    time: "08:00"
-    days: [sat, sun]
-    enabled: true
-    sound: music_assistant
-    music_uri: "media-source://music_assistant/playlist/morning"
-    melody: "gentle"
-
 audio:
   volume_start: 20         # % volume when alarm starts
   volume_max: 80           # % volume ceiling
@@ -43,8 +28,7 @@ snooze:
   duration_minutes: 9
 
 sunrise:
-  enabled: true
-  ramp_minutes: 20         # how long before alarm to start
+  ramp_minutes: 20         # global default; overridden per-alarm
   max_brightness: 255
   num_leds: 6              # number of WS2812B LEDs in the strip
 

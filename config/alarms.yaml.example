@@ -1,0 +1,23 @@
+alarms:
+  - label: "Weekdays"
+    time: "06:30"
+    days: [mon, tue, wed, thu, fri]
+    enabled: true
+    sound: music_assistant
+    music_uri: "media-source://music_assistant/playlist/morning"
+    melody: "default"
+    snooze_minutes: 9
+    sunrise_enabled: true
+    sunrise_ramp_minutes: 20
+    buzzer_duty_cycle: 50
+  - label: "Weekends"
+    time: "08:00"
+    days: [sat, sun]
+    enabled: true
+    sound: music_assistant
+    music_uri: "media-source://music_assistant/playlist/morning"
+    melody: "gentle"
+    snooze_minutes: 9
+    sunrise_enabled: true
+    sunrise_ramp_minutes: 20
+    buzzer_duty_cycle: 50

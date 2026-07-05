@@ -1,8 +1,12 @@
 import os
+import shutil
 import tempfile
 
 import yaml
 from dotenv import load_dotenv
+
+ALARMS_PATH = "config/alarms.yaml"
+ALARMS_EXAMPLE_PATH = "config/alarms.yaml.example"
 
 load_dotenv()  # loads .env into os.environ (no-op if file absent)
 
@@ -30,6 +34,25 @@ def load_config(path: str = "config/settings.yaml") -> dict:
         ha["dashboard_url"] = ha_dashboard_url
 
     return cfg
+
+
+def load_alarms(path: str = ALARMS_PATH) -> list:
+    if not os.path.exists(path):
+        shutil.copy(ALARMS_EXAMPLE_PATH, path)
+    with open(path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    return data.get("alarms", [])
+
+
+def save_alarms(alarms: list, path: str = ALARMS_PATH) -> None:
+    """Write alarms atomically to alarms.yaml."""
+    dir_name = os.path.dirname(os.path.abspath(path))
+    with tempfile.NamedTemporaryFile(
+        "w", dir=dir_name, delete=False, suffix=".tmp", encoding="utf-8"
+    ) as tmp:
+        yaml.dump({"alarms": alarms}, tmp, default_flow_style=False, allow_unicode=True)
+        tmp_path = tmp.name
+    os.replace(tmp_path, path)
 
 
 def save_config(data: dict, path: str = "config/settings.yaml") -> None:

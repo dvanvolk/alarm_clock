@@ -56,6 +56,10 @@ class Alarm:
     sound: str       # "music_assistant" | "buzzer"
     music_uri: str = ""
     melody: str = "default"
+    snooze_minutes: int = 9
+    sunrise_enabled: bool = True
+    sunrise_ramp_minutes: int = 20
+    buzzer_duty_cycle: int = 50
 
     def matches(self, now: datetime) -> bool:
         if not self.enabled:
@@ -71,6 +75,9 @@ class Alarm:
 
 
 def _parse_alarms(config: dict) -> list[Alarm]:
+    global_snooze = config.get("snooze", {}).get("duration_minutes", 9)
+    global_ramp   = config.get("sunrise", {}).get("ramp_minutes", 20)
+    global_duty   = config.get("buzzer", {}).get("duty_cycle", 50)
     alarms = []
     for entry in config.get("alarms", []):
         alarms.append(Alarm(
@@ -81,6 +88,10 @@ def _parse_alarms(config: dict) -> list[Alarm]:
             sound=entry.get("sound", "buzzer"),
             music_uri=entry.get("music_uri", ""),
             melody=entry.get("melody", "default"),
+            snooze_minutes=entry.get("snooze_minutes", global_snooze),
+            sunrise_enabled=entry.get("sunrise_enabled", True),
+            sunrise_ramp_minutes=entry.get("sunrise_ramp_minutes", global_ramp),
+            buzzer_duty_cycle=entry.get("buzzer_duty_cycle", global_duty),
         ))
     return alarms
 
@@ -128,11 +139,10 @@ class AlarmScheduler:
                     await self._fire(alarm)
                     return
             # Check if any alarm is within the sunrise window
-            if self._sunrise_cfg.get("enabled"):
-                for alarm in self._alarms:
-                    if self._in_sunrise_window(alarm, now):
-                        await self._start_sunrise(alarm, now)
-                        return
+            for alarm in self._alarms:
+                if alarm.sunrise_enabled and self._in_sunrise_window(alarm, now):
+                    await self._start_sunrise(alarm, now)
+                    return
 
         elif self._state == AlarmState.SUNRISE:
             for alarm in self._alarms:
@@ -152,12 +162,11 @@ class AlarmScheduler:
     def _in_sunrise_window(self, alarm: Alarm, now: datetime) -> bool:
         if not alarm.would_fire_today(now):
             return False
-        ramp = self._sunrise_cfg.get("ramp_minutes", 20)
         h, m = map(int, alarm.time.split(":"))
         alarm_dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
         if alarm_dt <= now:
             return False
-        return (alarm_dt - now).total_seconds() <= ramp * 60
+        return (alarm_dt - now).total_seconds() <= alarm.sunrise_ramp_minutes * 60
 
     async def _start_sunrise(self, alarm: Alarm, now: datetime) -> None:
         self._state = AlarmState.SUNRISE
@@ -194,8 +203,7 @@ class AlarmScheduler:
         elif alarm.sound == "music_assistant":
             log.info("[NO HA] Would play Music Assistant: %s", alarm.music_uri)
         else:
-            duty = self._buzzer_cfg.get("duty_cycle", 50)
-            self._buzz_task = asyncio.create_task(_melody_loop(alarm.melody, duty))
+            self._buzz_task = asyncio.create_task(_melody_loop(alarm.melody, alarm.buzzer_duty_cycle))
 
         # Volume ramp — real via HA, stub fallback without it
         if self._ha:
@@ -218,7 +226,7 @@ class AlarmScheduler:
         hw.stop_buzz()
         if self._ha:
             await self._ha.stop_music()
-        self._snooze_until = datetime.now() + timedelta(minutes=self._snooze_minutes)
+        self._snooze_until = datetime.now() + timedelta(minutes=self._active.snooze_minutes)
         self._state = AlarmState.SNOOZED
         log.info("Snoozed until %s", self._snooze_until.strftime("%H:%M"))
         await self._manager.broadcast({"type": "alarm_snoozed", "until": self._snooze_until.strftime("%H:%M")})

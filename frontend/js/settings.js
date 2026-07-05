@@ -62,7 +62,7 @@ function sendMsg(obj) {
 function renderAlarms(alarms) {
   const list = document.getElementById('alarm-list');
   if (!alarms.length) {
-    list.innerHTML = '<p style="color:var(--dim)">No alarms configured.</p>';
+    list.innerHTML = '<p style="color:var(--dim);padding:20px;">No alarms configured.</p>';
     return;
   }
   list.innerHTML = alarms.map((alarm, i) => alarmCardHtml(alarm, i)).join('');
@@ -77,6 +77,7 @@ function alarmCardHtml(alarm, index) {
   `).join('');
 
   const isMusic = alarm.sound === 'music_assistant';
+  const sunriseOn = alarm.sunrise_enabled !== false;
 
   const melodyOptions = MELODY_OPTIONS.map(opt =>
     `<option value="${opt.value}" ${alarm.melody === opt.value ? 'selected' : ''}>${opt.label}</option>`
@@ -88,6 +89,7 @@ function alarmCardHtml(alarm, index) {
       <div class="alarm-header-row">
         <input type="checkbox" class="alarm-enabled" ${alarm.enabled ? 'checked' : ''} title="Enabled">
         <input type="text" class="alarm-label-input" value="${escHtml(alarm.label || '')}" placeholder="Alarm name">
+        <button class="btn-delete-alarm" onclick="deleteAlarm(${index})" title="Delete alarm">✕</button>
       </div>
 
       <div class="card-row">
@@ -118,6 +120,33 @@ function alarmCardHtml(alarm, index) {
         <select class="alarm-melody-select">${melodyOptions}</select>
       </div>
 
+      <div class="card-row alarm-buzzer-row${isMusic ? ' hidden' : ''}">
+        <span class="card-label">Duty</span>
+        <input type="number" class="alarm-number-input alarm-buzzer-duty"
+               value="${alarm.buzzer_duty_cycle ?? 50}" min="1" max="100">
+        <span class="card-unit">%</span>
+      </div>
+
+      <div class="card-row">
+        <span class="card-label">Snooze</span>
+        <input type="number" class="alarm-number-input alarm-snooze-minutes"
+               value="${alarm.snooze_minutes ?? 9}" min="1" max="60">
+        <span class="card-unit">min</span>
+      </div>
+
+      <div class="card-row">
+        <span class="card-label">Sunrise</span>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" class="alarm-sunrise-enabled"
+                 ${sunriseOn ? 'checked' : ''}
+                 onchange="onSunriseChange(this)">
+          <span style="color:var(--dim);font-size:0.8rem">Enable</span>
+        </label>
+        <input type="number" class="alarm-number-input alarm-sunrise-ramp${sunriseOn ? '' : ' hidden'}"
+               value="${alarm.sunrise_ramp_minutes ?? 20}" min="1" max="120">
+        <span class="card-unit alarm-sunrise-ramp-unit${sunriseOn ? '' : ' hidden'}">min before</span>
+      </div>
+
     </div>
   `;
 }
@@ -135,24 +164,57 @@ function onSoundChange(select) {
   const isMusic = select.value === 'music_assistant';
   card.querySelector('.alarm-music-row').classList.toggle('hidden', !isMusic);
   card.querySelector('.alarm-melody-row').classList.toggle('hidden', isMusic);
+  card.querySelector('.alarm-buzzer-row').classList.toggle('hidden', isMusic);
+}
+
+function onSunriseChange(checkbox) {
+  const card = checkbox.closest('.alarm-card');
+  const enabled = checkbox.checked;
+  card.querySelector('.alarm-sunrise-ramp').classList.toggle('hidden', !enabled);
+  card.querySelector('.alarm-sunrise-ramp-unit').classList.toggle('hidden', !enabled);
+}
+
+function addAlarm() {
+  currentAlarms.push({
+    label: 'New Alarm',
+    time: '07:00',
+    days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+    enabled: true,
+    sound: 'buzzer',
+    music_uri: '',
+    melody: 'default',
+    snooze_minutes: 9,
+    sunrise_enabled: true,
+    sunrise_ramp_minutes: 20,
+    buzzer_duty_cycle: 50,
+  });
+  renderAlarms(currentAlarms);
+}
+
+function deleteAlarm(index) {
+  currentAlarms.splice(index, 1);
+  renderAlarms(currentAlarms);
 }
 
 function saveSettings() {
   const cards = document.querySelectorAll('.alarm-card');
   const alarms = Array.from(cards).map(card => {
-    const index = parseInt(card.dataset.index, 10);
     const checkedDays = Array.from(
       card.querySelectorAll('input[type=checkbox][name^="days_"]:checked')
     ).map(cb => cb.value);
 
     return {
-      label:     card.querySelector('.alarm-label-input').value.trim() || currentAlarms[index]?.label || '',
-      time:      card.querySelector('.alarm-time').value,
-      days:      checkedDays,
-      enabled:   card.querySelector('.alarm-enabled').checked,
-      sound:     card.querySelector('.alarm-sound-select').value,
-      music_uri: card.querySelector('.alarm-music-uri').value.trim(),
-      melody:    card.querySelector('.alarm-melody-select').value,
+      label:               card.querySelector('.alarm-label-input').value.trim() || 'Alarm',
+      time:                card.querySelector('.alarm-time').value,
+      days:                checkedDays,
+      enabled:             card.querySelector('.alarm-enabled').checked,
+      sound:               card.querySelector('.alarm-sound-select').value,
+      music_uri:           card.querySelector('.alarm-music-uri').value.trim(),
+      melody:              card.querySelector('.alarm-melody-select').value,
+      snooze_minutes:      parseInt(card.querySelector('.alarm-snooze-minutes').value) || 9,
+      sunrise_enabled:     card.querySelector('.alarm-sunrise-enabled').checked,
+      sunrise_ramp_minutes: parseInt(card.querySelector('.alarm-sunrise-ramp').value) || 20,
+      buzzer_duty_cycle:   parseInt(card.querySelector('.alarm-buzzer-duty').value) || 50,
     };
   });
 
