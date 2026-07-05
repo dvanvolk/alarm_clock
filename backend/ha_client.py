@@ -442,42 +442,94 @@ class HAClient:
         return {"type": "call_service", "domain": domain, "service": service, "service_data": data}
 
     # ------------------------------------------------------------------
+    # Entity state (HA REST — reuses the weather urllib pattern)
+    # ------------------------------------------------------------------
+
+    def _fetch_entity_state_sync(self, entity_id: str) -> Optional[str]:
+        """Blocking REST call to read a single HA entity state. Run via to_thread."""
+        base_url = self._ha_cfg.get("url", "").rstrip("/")
+        token = self._ha_cfg.get("token", "")
+        if not (base_url and token and entity_id):
+            return None
+        req = urllib.request.Request(
+            f"{base_url}/api/states/{entity_id}",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return json.loads(resp.read()).get("state")
+        except Exception as e:
+            log.warning("HA: could not fetch state of %s: %s", entity_id, e)
+            return None
+
+    async def get_entity_state(self, entity_id: str) -> Optional[str]:
+        return await asyncio.to_thread(self._fetch_entity_state_sync, entity_id)
+
+    async def get_music_target_entity(self) -> str:
+        """
+        Resolve the playback target entity at call time.
+
+        Reads input_select.music_target → looks up zone_entity_map.
+        If the zone entry is a mode-keyed dict, also reads input_select.playback_mode.
+        Falls back to music_player_entity at every failure point.
+        """
+        default = self._ha_cfg.get("music_player_entity", "")
+        target_select = self._ha_cfg.get("music_target_select", "").strip()
+        zone_map = self._ha_cfg.get("zone_entity_map", {})
+
+        if not target_select or not zone_map:
+            return default
+
+        zone = await self.get_entity_state(target_select)
+        if not zone or zone not in zone_map:
+            log.warning("HA: zone %r not in zone_entity_map — using default player", zone)
+            return default
+
+        zone_entry = zone_map[zone]
+        if isinstance(zone_entry, str):
+            return zone_entry
+
+        # Mode-aware nested map
+        mode_select = self._ha_cfg.get("playback_mode_select", "").strip()
+        if mode_select:
+            mode = await self.get_entity_state(mode_select)
+            if mode and mode in zone_entry:
+                return zone_entry[mode]
+
+        return zone_entry.get("Auto", next(iter(zone_entry.values()), default))
+
+    # ------------------------------------------------------------------
     # Music / Volume (called from AlarmScheduler)
     # ------------------------------------------------------------------
 
-    async def trigger_music(self, uri: str, audio_cfg: dict) -> None:
-        """Set initial volume and start Music Assistant playback."""
-        player = self._ha_cfg.get("music_player_entity", "")
-        if not player:
-            log.warning("HAClient: music_player_entity not set in config")
+    async def trigger_music(self, uri: str, audio_cfg: dict, target_entity: str) -> None:
+        """Set initial volume and start Music Assistant playback on target_entity."""
+        if not target_entity:
+            log.warning("HAClient: no target entity for music playback")
             return
-
         vol_start = audio_cfg.get("volume_start", 20) / 100.0
         await self._ha_ws_call(self._svc(
             "media_player", "volume_set",
-            {"entity_id": player, "volume_level": round(vol_start, 2)},
+            {"entity_id": target_entity, "volume_level": round(vol_start, 2)},
         ))
         await self._ha_ws_call(self._svc(
             "music_assistant", "play_media",
-            {"entity_id": player, "media_id": uri, "enqueue": "replace"},
+            {"entity_id": target_entity, "media_id": uri, "enqueue": "replace"},
         ))
-        log.info("Music Assistant: playing %s on %s", uri, player)
+        log.info("Music Assistant: playing %s on %s", uri, target_entity)
 
-    async def stop_music(self) -> None:
-        """Stop media player playback."""
-        player = self._ha_cfg.get("music_player_entity", "")
-        if not player:
+    async def stop_music(self, target_entity: str) -> None:
+        """Stop media player playback on target_entity."""
+        if not target_entity:
             return
         await self._ha_ws_call(self._svc(
-            "media_player", "media_stop", {"entity_id": player}
+            "media_player", "media_stop", {"entity_id": target_entity}
         ))
 
-    async def volume_ramp(self, audio_cfg: dict) -> None:
+    async def volume_ramp(self, audio_cfg: dict, target_entity: str) -> None:
         """Gradually ramp media player volume from start % to max % over ramp_seconds."""
-        player = self._ha_cfg.get("music_player_entity", "")
-        if not player:
+        if not target_entity:
             return
-
         start = audio_cfg.get("volume_start", 20) / 100.0
         maximum = audio_cfg.get("volume_max", 80) / 100.0
         ramp_seconds = audio_cfg.get("volume_ramp_seconds", 120)
@@ -485,13 +537,12 @@ class HAClient:
         step_size = (maximum - start) / steps
         step_delay = ramp_seconds / steps
         volume = start
-
         try:
             for _ in range(steps):
                 volume = min(volume + step_size, maximum)
                 await self._ha_ws_call(self._svc(
                     "media_player", "volume_set",
-                    {"entity_id": player, "volume_level": round(volume, 2)},
+                    {"entity_id": target_entity, "volume_level": round(volume, 2)},
                 ))
                 log.debug("Volume → %.0f%%", volume * 100)
                 await asyncio.sleep(step_delay)

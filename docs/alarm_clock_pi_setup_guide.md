@@ -753,7 +753,77 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 
 ---
 
-## Part 15 — Final Checks
+## Part 15 — Snapcast Client Setup
+
+Install `snapclient` so HA can see the alarm clock Pi as a Snapcast media player and Music
+Assistant can route audio to it like any other zone.
+
+### 15.1 Identify the Snapcast Server
+
+Your existing Snapcast Pis (`lancerSnapcast`, `firestarSnapcast`) should have a server running
+on one of them. Find its IP address:
+
+```bash
+# From any Pi on the network
+avahi-browse -r _snapcast._tcp
+# or check your router's DHCP table for the Pi's IP
+```
+
+Alternatively, SSH into one of the existing Snapcast Pis and run `snapserver --version` to
+confirm it's the server.
+
+### 15.2 Install Snapclient
+
+```bash
+sudo apt install snapclient
+```
+
+### 15.3 Configure the Server Address
+
+Edit the defaults file:
+
+```bash
+sudo nano /etc/default/snapclient
+```
+
+Set:
+
+```
+SNAPCLIENT_OPTS="--host <snapserver-ip> --soundcard default"
+```
+
+Replace `<snapserver-ip>` with the IP of the Pi running `snapserver`. If the HiFiBerry DAC+
+Pro is the desired output, replace `default` with its ALSA name:
+
+```bash
+# Find the correct ALSA name
+aplay -l
+# Look for "HiFiBerry DAC+" and use its card name, e.g. "sndrpihifiberry"
+```
+
+### 15.4 Enable and Start
+
+```bash
+sudo systemctl enable snapclient
+sudo systemctl start snapclient
+sudo systemctl status snapclient   # should show "active (running)"
+```
+
+### 15.5 Verify in Home Assistant
+
+1. In HA go to **Settings → Devices & Services → Snapcast** (it should auto-discover the new client)
+2. Note the new `media_player.*` entity ID (e.g., `media_player.alarmclock_snapcast`)
+3. Add it to `zone_entity_map` in `config/settings.yaml`:
+
+```yaml
+zone_entity_map:
+  Bedroom:
+    Sync: "media_player.alarmclock_snapcast"
+```
+
+---
+
+## Part 16 — Final Checks
 
 Run through this checklist before considering the setup complete:
 

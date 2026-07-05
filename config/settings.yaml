@@ -50,7 +50,33 @@ home_assistant:
   token: ""                    # Set via HA_TOKEN in .env — do not put real token here
   mqtt_broker: "homeassistant.local"
   mqtt_port: 1883
-  music_player_entity: ""      # e.g. "media_player.alarm_clock"
+  music_player_entity: ""      # fallback entity when no zone_entity_map match is found
+
+  # Multi-zone playback: read these input_selects at alarm fire time to pick the target player
+  music_target_select: "input_select.music_target"
+  playback_mode_select: "input_select.playback_mode"
+
+  # Maps input_select.music_target option names → HA media_player entity IDs.
+  # Values may be a flat entity ID string, or a dict keyed by playback_mode (Sync/WIIM/Auto).
+  zone_entity_map:
+    Downstairs:
+      Sync: "media_player.lancerSnapcast"
+      WIIM: "media_player.wiim_pro_ea7a"
+      Auto: "media_player.lancerSnapcast"
+    Upstairs:
+      Sync: "media_player.firestarSnapcast"
+      WIIM: "media_player.second_floor_wiim"
+      Auto: "media_player.firestarSnapcast"
+    Whole House: "media_player.lancerSnapcast"
+    # Add remaining zones after identifying their HA entity IDs:
+    # Kitchen: "media_player.kitchen_snapcast"
+    # Living Room: "media_player.living_room_snapcast"
+    # Office: "media_player.office_snapcast"
+    # Dining Room: "media_player.dining_room_snapcast"
+    # Main Bathroom: "media_player.main_bathroom_snapcast"
+    # Aiden's Room: "media_player.aidens_room_snapcast"
+    # Guest Room: "media_player.guest_room_snapcast"
+    # Elizabeth's Room: "media_player.elizabeths_room_snapcast"
 
 ota:
   git_branch: "master"
