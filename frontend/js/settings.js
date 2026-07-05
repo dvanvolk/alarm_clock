@@ -45,6 +45,8 @@ function connect() {
       if (urlInput && msg.dashboard_url !== undefined) {
         urlInput.value = msg.dashboard_url;
       }
+    } else if (msg.type === 'ota_status') {
+      handleOtaStatus(msg);
     }
   });
 }
@@ -228,6 +230,32 @@ function showSaveStatus(text, cssClass) {
   el.textContent = text;
   el.className = cssClass;
   setTimeout(() => { el.textContent = ''; el.className = ''; }, 3000);
+}
+
+// ---------------------------------------------------------------------------
+// Software update
+// ---------------------------------------------------------------------------
+
+function sendOtaTrigger() {
+  const btn = document.getElementById('btn-update');
+  if (btn) btn.disabled = true;
+  sendMsg({ type: 'ota_trigger' });
+}
+
+function handleOtaStatus(msg) {
+  const el = document.getElementById('ota-status');
+  const btn = document.getElementById('btn-update');
+  if (!el) return;
+  const labels = {
+    starting:    'Checking for updates…',
+    installing:  'Installing dependencies…',
+    success:     `Updated: ${msg.detail || ''}`,
+    restarting:  'Restarting — reconnecting shortly…',
+    error:       `Update failed: ${msg.detail || 'unknown error'}`,
+  };
+  el.textContent = labels[msg.status] ?? msg.status;
+  el.className = `ota-status-${msg.status}`;
+  if (btn) btn.disabled = msg.status === 'starting' || msg.status === 'installing' || msg.status === 'restarting';
 }
 
 // ---------------------------------------------------------------------------
