@@ -1,6 +1,6 @@
 # Alarm Clock — Raspberry Pi Setup Guide
 
-Complete step-by-step guide to setting up the Raspberry Pi 3 for the alarm clock project,
+Complete step-by-step guide to setting up the Raspberry Pi 3B for the alarm clock project,
 from a fresh SD card to a running kiosk.
 
 ---
@@ -10,23 +10,22 @@ from a fresh SD card to a running kiosk.
 ### Hardware
 - Raspberry Pi 3B
 - Official Raspberry Pi 7" Touchscreen (DSI)
-- HiFiBerry DAC+ Pro HAT
-- DS3231 RTC module
-- BH1750 light sensor module
-- DHT22 temperature and humidity sensor module
-- 4.7kΩ resistor (pull-up for DHT22 data line — skip if your DHT22 module has one built in)
-- Momentary push button (snooze)
-- Passive piezo buzzer
+- 2× Adafruit MAX98357A I2S Amplifier Breakout (#3006)
+- 2× Adafruit Mono Enclosed Speaker 3W 4Ω (#4445)
+- DS3231 RTC module + CR2032 battery
+- Adafruit BH1750 light sensor breakout (or GY-302 bare module)
+- Momentary pushbutton × 2 (snooze + power)
+- Active buzzer
 - WS2812B LED strip
+- 74AHCT125 level shifter IC
 - MicroSD card (16GB minimum, Class 10 or better)
-- 5V/3A USB-C power supply (the official Pi PSU is recommended)
-- Powered speakers with RCA input
-- Jumper wires and breadboard or terminal block for GPIO connections
-- CR2032 battery for DS3231 RTC
+- 5V/4A power supply with barrel jack (5.5mm/2.1mm)
+- Jumper wires and breadboard or terminal blocks
+- TONOR G11 USB microphone (for future voice control)
 
 ### On Your Computer
 - [Raspberry Pi Imager](https://www.raspberrypi.com/software/) installed
-- SSH client (Terminal on Mac/Linux, PuTTY or Windows Terminal on Windows)
+- SSH client (Terminal on Mac/Linux, Windows Terminal on Windows)
 
 ---
 
@@ -34,42 +33,36 @@ from a fresh SD card to a running kiosk.
 
 ### 1.1 Open Raspberry Pi Imager
 
-1. Launch **Raspberry Pi Imager** on your computer
-2. Click **Choose Device** → select **Raspberry Pi 3**
-3. Click **Choose OS** → select **Raspberry Pi OS (64-bit)** (the full desktop version)
+1. Launch Raspberry Pi Imager
+2. Click **Choose Device** → **Raspberry Pi 3**
+3. Click **Choose OS** → **Raspberry Pi OS (64-bit)** (full desktop version)
 4. Click **Choose Storage** → select your SD card
 
 ### 1.2 Configure Before Writing
 
-Click the **gear icon (⚙)** or **Edit Settings** before writing to pre-configure:
+Click **Edit Settings** before writing:
 
 **General tab:**
-- Set hostname: `alarmclock`
-- Enable **Set username and password** → username: `pi`, set a strong password
-- Configure **WiFi**: enter your network name and password, set country code
-- Set **locale**: your timezone and keyboard layout
+- Hostname: `alarmclock`
+- Username: `pi`, set a strong password
+- Configure WiFi: network name, password, country code
+- Locale: your timezone and keyboard layout
 
 **Services tab:**
-- Enable **SSH** → select **Use password authentication**
+- Enable SSH → Use password authentication
 
-Click **Save**, then **Yes** to apply settings, then **Yes** to write.
+Click **Save** → **Yes** → **Yes** to write.
 
 ### 1.3 Boot the Pi
 
-1. Insert the SD card into the Pi
-2. Connect the touchscreen via DSI ribbon cable before powering on
+1. Insert SD card into Pi
+2. Connect touchscreen via DSI ribbon cable before powering on
 3. Power on — first boot takes 1–2 minutes
-4. Find the Pi's IP address from your router, or use `alarmclock.local`
+4. Connect via SSH: `ssh pi@alarmclock.local`
 
 ---
 
-## Part 2 — Initial SSH Setup
-
-Connect from your computer:
-
-```bash
-ssh pi@alarmclock.local
-```
+## Part 2 — Initial System Setup
 
 ### 2.1 Update the System
 
@@ -78,10 +71,7 @@ sudo apt update && sudo apt full-upgrade -y
 sudo reboot
 ```
 
-Reconnect after reboot:
-```bash
-ssh pi@alarmclock.local
-```
+Reconnect after reboot: `ssh pi@alarmclock.local`
 
 ### 2.2 Set the Timezone
 
@@ -89,9 +79,7 @@ ssh pi@alarmclock.local
 sudo raspi-config
 ```
 
-Navigate to: **5 Localisation Options** → **L2 Timezone** → select your region and city.
-
-Exit raspi-config and reboot if prompted.
+Navigate to: **5 Localisation Options** → **L2 Timezone** → select your region.
 
 ---
 
@@ -101,10 +89,8 @@ Exit raspi-config and reboot if prompted.
 sudo raspi-config
 ```
 
-Enable the following under **3 Interface Options**:
-
+Under **3 Interface Options**, enable:
 - **I2C** — for DS3231 RTC and BH1750 light sensor
-- **SPI** — not required now but useful for future expansion
 
 Exit and reboot:
 ```bash
@@ -113,56 +99,43 @@ sudo reboot
 
 ---
 
-## Part 4 — Configure the HiFiBerry DAC+ Pro
+## Part 4 — Configure the MAX98357A Stereo Amplifiers
 
-### 4.1 Disable the Default Audio
+### 4.1 Disable Default Audio
 
 ```bash
-sudo nano /boot/firmware/config.txt
+sudo nano /boot/config.txt
 ```
 
-Find this line and comment it out (add `#` at the start):
+Comment out the default audio line:
 ```
 # dtparam=audio=on
 ```
 
-### 4.2 Enable the HiFiBerry Overlay
+### 4.2 Enable I2S DAC Overlay
 
-Add these lines at the bottom of `/boot/firmware/config.txt`:
+Add to the bottom of `/boot/config.txt`:
 ```
-# HiFiBerry DAC+ Pro
-dtoverlay=hifiberry-dacplus-std
+# MAX98357A I2S stereo amplifier
+dtoverlay=hifiberry-dac
 ```
 
-Save and exit (`Ctrl+X`, `Y`, `Enter`).
-
-### 4.3 Reboot and Verify
-
+Save and reboot:
 ```bash
 sudo reboot
 ```
 
-After reboot, verify the DAC is detected:
+### 4.3 Verify I2S Audio Device
+
 ```bash
 aplay -l
 ```
 
-You should see two cards — HDMI and the HiFiBerry:
-```
-card 0: vc4hdmi [vc4-hdmi], device 0: MAI PCM i2s-hifi-0 [MAI PCM i2s-hifi-0]
-card 1: sndrpihifiberry [snd_rpi_hifiberry_dacplus], device 0: HiFiBerry DAC+ HiFi pcm512x-hifi-0
-```
+You should see a HifiBerry DAC or similar I2S device listed.
 
-Test audio output on the HiFiBerry (card 1). You should hear alternating "Front Left" and "Front Right" announcements from each speaker:
-```bash
-speaker-test -D hw:1,0 -c 2 -t wav
-```
+### 4.4 Configure ALSA Software Volume
 
-If only one speaker plays, check that both RCA cables are fully seated at the DAC+ Pro and at the speaker inputs. Swap the two cables temporarily — if the silent side follows the cable, replace that cable; if it stays on the same speaker, the speaker input is the issue.
-
-### 4.4 Set HiFiBerry as ALSA Default
-
-Without a default configured, tools and the Python backend must always specify `hw:1,0` explicitly. Set the HiFiBerry as the system default so `hw:default` works:
+The MAX98357A has no hardware volume control — use ALSA softvol:
 
 ```bash
 sudo nano /etc/asound.conf
@@ -170,23 +143,48 @@ sudo nano /etc/asound.conf
 
 Add:
 ```
-defaults.pcm.card 1
-defaults.ctl.card 1
+pcm.speakersafevol {
+  type softvol
+  slave.pcm "hw:0"
+  control {
+    name "Speaker"
+    card 0
+  }
+  min_dB -90.0
+  max_dB 0.0
+}
+
+pcm.!default {
+  type plug
+  slave.pcm "speakersafevol"
+}
 ```
 
-Save and exit. After this, `speaker-test -c 2 -t wav` (without `-D`) will use the HiFiBerry.
-
-### 4.5 Set Default Volume
-
+Save and test audio:
 ```bash
-amixer sset 'Digital' 80%
+speaker-test -c 2 -t wav
 ```
 
-To make volume persistent, install `alsa-utils` and save state:
-```bash
-sudo apt install -y alsa-utils
-sudo alsactl store
-```
+### 4.5 Wire the MAX98357A Boards
+
+Both boards share the same I2S lines from the Pi:
+
+| Signal | GPIO | Pi Pin | Both boards |
+|---|---|---|---|
+| BCLK | GPIO18 | Pin 12 | ✓ |
+| LRCLK | GPIO19 | Pin 35 | ✓ |
+| DIN | GPIO20 | Pin 38 | ✓ |
+| GND | — | Pin 39 | ✓ |
+| VIN | — | Pin 2 (5V) | ✓ |
+
+**Stereo channel selection via SD pin:**
+
+| Board | SD Pin Connection | Channel |
+|---|---|---|
+| Amp #1 (Left) | SD → 3.3V via 100kΩ resistor | Left only |
+| Amp #2 (Right) | SD → GND via 100kΩ resistor | Right only |
+
+Connect speakers (Adafruit #4445 bare wires) to the green screw terminal on each board.
 
 ---
 
@@ -194,27 +192,24 @@ sudo alsactl store
 
 ### 5.1 Wire the DS3231
 
-Connect the DS3231 module to the Pi GPIO header (or the HiFiBerry's pass-through header):
+Connect to the Pi GPIO header (or HAT pass-through):
 
-| DS3231 Pin | Pi GPIO Pin | GPIO Number |
+| DS3231 Pin | Pi Pin | GPIO |
 |---|---|---|
 | VCC | Pin 1 | 3.3V |
 | GND | Pin 6 | GND |
 | SDA | Pin 3 | GPIO2 |
 | SCL | Pin 5 | GPIO3 |
 
-Insert the CR2032 battery into the DS3231 module.
-
-> **Note:** The HiFiBerry DAC+ Pro passes through the I2C pins on its header.
-> Connect the DS3231 to the HiFiBerry's GPIO pass-through, not directly to the Pi.
+Insert CR2032 battery into the module.
 
 ### 5.2 Enable the RTC Driver
 
 ```bash
-sudo nano /boot/firmware/config.txt
+sudo nano /boot/config.txt
 ```
 
-Add at the bottom:
+Add:
 ```
 # DS3231 RTC
 dtoverlay=i2c-rtc,ds3231
@@ -225,23 +220,42 @@ Save and reboot:
 sudo reboot
 ```
 
-### 5.3 Verify the RTC is Detected
+### 5.3 Verify RTC Detection
 
 ```bash
 sudo i2cdetect -y 1
 ```
 
-You should see `68` in the grid — that is the DS3231 address.
+You should see `68` in the grid.
 
-### 5.4 Verify RTC is Working
-
-On Raspberry Pi OS Bookworm, systemd syncs the RTC automatically — no manual `hwclock` commands are needed. Confirm the RTC is visible and showing the correct time:
+### 5.4 Remove the Fake Hardware Clock
 
 ```bash
-timedatectl
+sudo apt remove -y fake-hwclock
+sudo update-rc.d -f fake-hwclock remove
+sudo systemctl disable fake-hwclock
 ```
 
-Look for `RTC time:` in the output. If NTP is synced (shown as `System clock synchronized: yes`), systemd will keep the RTC updated at shutdown and read it back on boot.
+### 5.5 Fix hwclock Script
+
+```bash
+sudo nano /lib/udev/hwclock-set
+```
+
+Comment out these three lines:
+```bash
+#if [ -e /run/systemd/system ] ; then
+# exit 0
+#fi
+```
+
+### 5.6 Sync and Verify
+
+Once NTP is synced (`timedatectl` shows synchronized), write to RTC:
+```bash
+sudo hwclock -w
+sudo hwclock -r
+```
 
 ---
 
@@ -249,15 +263,17 @@ Look for `RTC time:` in the output. If NTP is synced (shown as `System clock syn
 
 ### 6.1 Wire the BH1750
 
-The BH1750 shares the I2C bus with the DS3231:
+Shares the I2C bus with the DS3231:
 
-| BH1750 Pin | Pi GPIO Pin | GPIO Number |
+| BH1750 Pin | Pi Pin | GPIO |
 |---|---|---|
 | VCC | Pin 1 | 3.3V |
 | GND | Pin 6 | GND |
 | SDA | Pin 3 | GPIO2 |
 | SCL | Pin 5 | GPIO3 |
-| ADDR | GND | (sets I2C address to 0x23) |
+| ADDR | GND | Sets address to 0x23 |
+
+If using the Adafruit BH1750 with STEMMA QT, use a STEMMA QT to JST SH cable to the I2C pins.
 
 ### 6.2 Verify Detection
 
@@ -265,126 +281,113 @@ The BH1750 shares the I2C bus with the DS3231:
 sudo i2cdetect -y 1
 ```
 
-You should now see both `23` (BH1750) and `68` (DS3231) in the grid.
+You should now see both `23` (BH1750) and `68` (DS3231).
 
 ---
 
 ## Part 7 — Wire the GPIO Components
 
-### 7.0 Full Wiring Diagram
-
-The diagram below shows all GPIO connections for the complete hardware build.
-The HiFiBerry DAC+ Pro sits on top of the 40-pin header; all wiring goes to
-the HiFiBerry's pass-through header (same pin numbers).
-
-```
-              Raspberry Pi 3B — 40-Pin GPIO Header
-              ─────────────────────────────────────
-              (viewed from above; pin 1 = top-left)
-
-  3.3V  ──[01]●  ●[02]── 5V
-  GPIO2 ──[03]●  ●[04]── 5V
-  GPIO3 ──[05]●  ●[06]── GND
-  GPIO4 ──[07]●  ●[08]
-  GND   ──[09]●  ●[10]
-  GPIO17──[11]●  ●[12]── GPIO18
-          [13]●  ●[14]── GND
-          [15]●  ●[16]
-  3.3V  ──[17]●  ●[18]
-          [19]●  ●[20]── GND
-          [21]●  ●[22]
-          [23]●  ●[24]
-  GND   ──[25]●  ●[26]
-          [27]●  ●[28]
-          [29]●  ●[30]── GND
-          [31]●  ●[32]── GPIO12
-  GPIO13──[33]●  ●[34]── GND
-          [35]●  ●[36]
-          [37]●  ●[38]
-  GND   ──[39]●  ●[40]
-```
-
-**Pin-to-component map:**
-
-| Pin | Signal | → Component |
-|-----|--------|-------------|
-| 1 | 3.3V | DS3231 VCC, BH1750 VCC, DHT22 VCC |
-| 3 | GPIO2 (SDA) | DS3231 SDA ── BH1750 SDA (shared I2C bus) |
-| 5 | GPIO3 (SCL) | DS3231 SCL ── BH1750 SCL (shared I2C bus) |
-| 6 | GND | DS3231 GND, BH1750 GND |
-| 7 | GPIO4 | DHT22 DATA (+ 4.7kΩ pull-up to 3.3V) |
-| 9 | GND | DHT22 GND, Snooze button (one leg) |
-| 11 | GPIO17 | Snooze button (other leg) — internal pull-up, no resistor needed |
-| 32 | GPIO12 | WS2812B Data In |
-| 33 | GPIO13 | Passive piezo (+) — PWM1, no HiFiBerry conflict |
-| 34 | GND | WS2812B GND (tie to external 5V supply GND) / piezo (−) |
-
-> **Note:** The piezo buzzer is on GPIO13 (Pin 33, PWM1). Do not use GPIO18
-> (Pin 12) for the buzzer — that pin is the I2S bit-clock for the HiFiBerry
-> DAC+ Pro and cannot be shared. GPIO12 (Pin 32) is also taken by the LED strip.
-
----
-
-### 7.1 Snooze Button (GPIO17)
-
-| Button Pin | Connection |
+### Snooze Button (GPIO17)
+| Connection | Detail |
 |---|---|
 | One leg | GPIO17 (Pin 11) |
 | Other leg | GND (Pin 9) |
 
-The software uses the Pi's internal pull-up resistor — no external resistor needed.
+Internal pull-up used in software — no external resistor needed.
 
-### 7.2 Passive Piezo Buzzer (GPIO13)
+### Power Shutdown Button (GPIO26)
+| Connection | Detail |
+|---|---|
+| One leg | GPIO26 (Pin 37) via 330Ω resistor |
+| Other leg | GND |
 
+Add to `/boot/config.txt`:
+```
+dtoverlay=gpio-shutdown,gpio_pin=26
+```
+
+### Power-On Button (GPIO3)
+| Connection | Detail |
+|---|---|
+| One leg | GPIO3 (Pin 5) via 330Ω resistor |
+| Other leg | GND |
+
+This is a Pi hardware feature — pressing it wakes the Pi from halt state. No software config needed. Can be the same button as shutdown or a separate one.
+
+### Active Buzzer (GPIO13)
 | Buzzer Pin | Connection |
 |---|---|
 | + (positive) | GPIO13 (Pin 33) |
-| − (negative) | GND (Pin 34) |
+| - (negative) | GND (Pin 34) |
 
-A passive piezo responds to PWM frequency, allowing the firmware to play tones
-at different pitches. An active buzzer (with an internal oscillator) will not
-respond to frequency changes and cannot play melodies — use a passive piezo.
+> **Note:** GPIO13 is hardware PWM1 — ideal for buzzer tone generation.
+> GPIO18 (PWM0) is reserved for I2S BCLK and cannot be used for the buzzer.
 
-### 7.3 WS2812B LED Strip (GPIO12)
+### WS2812B LED Strip (GPIO12) via 74AHCT125
 
+The Pi's 3.3V logic is technically out of spec for WS2812B — use a 74AHCT125 level shifter:
+
+```
+GPIO12 (3.3V) → 74AHCT125 input → 74AHCT125 output (5V) → WS2812B Data In
+```
+
+74AHCT125 wiring:
+- VCC → 5V
+- GND → GND
+- OE (output enable) → GND (always enabled)
+- Input A → GPIO12
+- Output Y → WS2812B Data In
+
+WS2812B power:
 | LED Strip Wire | Connection |
 |---|---|
-| Data In | GPIO12 (Pin 32) |
+| Data In | 74AHCT125 output |
 | +5V | External 5V supply |
-| GND | External GND (also connect to Pi GND Pin 34) |
+| GND | External GND + Pi GND (common ground) |
 
-> **Important:** WS2812B strips draw significant current. Do NOT power them from
-> the Pi's 5V pin. Use a separate 5V power supply rated for the number of LEDs
-> you are using (roughly 60mA per LED at full white).
-> Connect the GND of the external supply to a Pi GND pin.
-
-### 7.4 DHT22 Temperature and Humidity Sensor (GPIO4)
-
-| DHT22 Pin | Connection |
-|---|---|
-| VCC | 3.3V (Pin 1) |
-| GND | GND (Pin 9) |
-| DATA | GPIO4 (Pin 7) |
-
-The data line requires a pull-up resistor to ensure reliable reads:
-
-```
-3.3V (Pin 1) ──┬──[4.7kΩ]──┬── GPIO4 (Pin 7)
-               │            │
-             DHT22 VCC    DHT22 DATA
-             DHT22 GND ── GND (Pin 9)
-```
-
-> **Note:** Many DHT22 breakout modules (the three-pin variety sold on Amazon)
-> include the pull-up resistor on the PCB. If your module has only three pins
-> (VCC, DATA, GND) rather than four, the resistor is already built in and you
-> can wire DATA directly to GPIO4.
+> **Important:** Power WS2812B from an external 5V supply — NOT the Pi's 5V pin.
+> A 60mA-per-LED rule applies. Always connect external supply GND to Pi GND.
 
 ---
 
-## Part 8 — Install System Dependencies
+## Part 8 — Configure Display Brightness Control
 
-### 8.1 Core Packages
+The official RPi touchscreen brightness is controlled via sysfs:
+
+```bash
+# Set brightness (0–255)
+echo 150 | sudo tee /sys/class/backlight/rpi_backlight/brightness
+```
+
+Allow the `pi` user to control backlight without sudo:
+
+```bash
+sudo nano /etc/udev/rules.d/99-backlight.rules
+```
+
+Add:
+```
+SUBSYSTEM=="backlight", ACTION=="add", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
+```
+
+Add pi to video group:
+```bash
+sudo usermod -a -G video pi
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+### Display Rotation (if needed)
+
+Add to `/boot/config.txt`:
+```
+display_rotate=2    # 0=normal, 1=90°, 2=180°, 3=270°
+```
+
+---
+
+## Part 9 — Install System Dependencies
+
+### 9.1 Core Packages
 
 ```bash
 sudo apt install -y \
@@ -398,24 +401,19 @@ sudo apt install -y \
   xinit \
   xserver-xorg \
   alsa-utils \
-  libasound2-dev \
+  python3-alsaaudio \
   chrony \
   i2c-tools \
-  libgpiod3 \
-  liblgpio-dev \
-  swig
+  libgpiod2
 ```
 
-### 8.2 WS2812B LED Support
-
-The `rpi_ws281x` library requires root or a specific udev rule to access PWM.
-Install the library:
+### 9.2 WS2812B LED Support
 
 ```bash
 sudo pip3 install rpi_ws281x --break-system-packages
 ```
 
-Add a udev rule so the app can access PWM without running as root:
+Add udev rule for PWM access without root:
 ```bash
 sudo nano /etc/udev/rules.d/99-pwm.rules
 ```
@@ -425,183 +423,101 @@ Add:
 SUBSYSTEM=="pwm*", PROGRAM="/bin/sh -c 'chown -R root:gpio /sys/class/pwm && chmod -R 770 /sys/class/pwm'"
 ```
 
-Add `pi` to the gpio group:
 ```bash
 sudo usermod -a -G gpio pi
 ```
 
 ---
 
-## Part 9 — Clone the Project and Install Python Dependencies
+## Part 10 — Clone the Project and Install Python Dependencies
 
-### 9.1 Clone the Repository
+### 10.1 Clone the Repository
 
 ```bash
-cd ~
+cd /home/pi
 git clone https://github.com/YOUR_USERNAME/alarm-clock.git
 cd alarm-clock
 ```
 
-> Replace `YOUR_USERNAME/alarm-clock` with your actual repository path and
-> directory name. The remaining steps in Part 9 assume you are running commands
-> from inside the project directory (`cd ~/alarm-clock` before each session).
-
-### 9.2 Create a Virtual Environment
+### 10.2 Create a Virtual Environment
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-### 9.3 Install Python Dependencies
+### 10.3 Install Python Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install \
+  fastapi \
+  uvicorn \
+  websockets \
+  RPi.GPIO \
+  smbus2 \
+  adafruit-circuitpython-ds3231 \
+  adafruit-circuitpython-bh1750 \
+  rpi-ws281x \
+  pyyaml \
+  paho-mqtt \
+  aiohttp \
+  python-dateutil \
+  alsaaudio
 ```
 
-> `adafruit-circuitpython-dht` requires `libgpiod3`, which is included in the
-> `apt install` command in Part 8.1.
-
-### 9.4 Run the Hardware Test
-
-With all Python packages installed and hardware wired (Part 7), run the hardware
-test script to verify every component before configuring the application:
+### 10.4 Copy and Edit the Config File
 
 ```bash
-sudo venv/bin/python scripts/test_hardware.py
-```
-
-The script runs automated tests first (I2C scan, BH1750, DS3231, DHT22), then
-interactive tests that ask you to confirm audio/visual output (buzzer, LEDs,
-snooze button). Each test reports PASS, FAIL, or SKIP, with a summary at the end.
-
-Options:
-```bash
-# If your LED strip has a different number of LEDs
-sudo venv/bin/python scripts/test_hardware.py --leds 12
-
-# Run a single test
-sudo venv/bin/python scripts/test_hardware.py --test bh1750
-
-# Run multiple specific tests
-sudo venv/bin/python scripts/test_hardware.py --test i2c,ds3231,dht22
-```
-
-If any test FAILs, check the wiring for that component in Part 7 and re-run
-before continuing. The alarm-clock service does not exist yet at this point,
-but if you re-run later with the service active, stop it first:
-```bash
-sudo systemctl stop alarm-clock
-```
-
-### 9.5 Edit the Config File
-
-Open `config/settings.yaml` and fill in your timezone, alarm times, Home
-Assistant URL, MQTT broker address, and DHT22 settings:
-
-```bash
+cp config/settings.yaml.example config/settings.yaml
 nano config/settings.yaml
 ```
 
-Key settings to review:
-
-```yaml
-clock:
-  timezone: "America/New_York"  # your local tz
-
-dht22:
-  enabled: true
-  gpio_pin: 4                   # BCM pin the DHT22 DATA wire is on
-  temperature_unit: "F"         # F or C
-
-home_assistant:
-  url: "http://homeassistant.local:8123"
-  mqtt_broker: "homeassistant.local"
-```
-
-> **Do not** put your HA token or MQTT password in `settings.yaml` — use the
-> `.env` file instead (see Part 9.5 below).
-
-### 9.6 Create the Secrets File (.env)
-
-Credentials are loaded from a `.env` file that is never committed to git.
-Copy the example and fill in your values:
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-The file should look like this (replace the placeholder values):
-
-```bash
-# Home Assistant long-lived access token
-# Generate at: HA → Profile → Security → Long-Lived Access Tokens
-HA_TOKEN=eyJ0eXAiOiJKV1Q...your_full_token_here
-
-# MQTT broker credentials (if your broker requires authentication)
-MQTT_USER=your_mqtt_username
-MQTT_PASS=your_mqtt_password
-```
-
-To generate a long-lived access token in Home Assistant:
-1. Open Home Assistant → click your profile (bottom-left)
-2. Scroll to **Security** → **Long-Lived Access Tokens**
-3. Click **Create Token**, name it `alarm-clock`, copy the token
-
-> `.env` is listed in `.gitignore` and will never be committed. The file
-> `.env.example` (committed) shows the required variable names without values.
+Fill in: timezone, HA URL, HA token, MQTT broker, alarm times, music URIs.
 
 ---
 
-## Part 10 — Configure NTP with chrony
+## Part 11 — Configure NTP with chrony
 
 ```bash
-sudo nano /etc/chrony/chrony.conf
+sudo systemctl enable chrony
+sudo systemctl start chrony
+chronyc tracking
 ```
 
-The defaults are fine for most setups. If your Home Assistant instance runs
-an NTP server, you can add it as a preferred source:
-
+Optionally add your HA NTP server to `/etc/chrony/chrony.conf`:
 ```
 server homeassistant.local iburst prefer
 ```
 
-Enable and start chrony:
-```bash
-sudo systemctl enable chrony
-sudo systemctl start chrony
-```
-
-Check sync status:
-```bash
-chronyc tracking
-```
-
 ---
 
-## Part 11 — Configure Kiosk Mode
+## Part 12 — Configure Kiosk Mode
 
-### 11.1 Set Up Openbox Autostart
+### 12.1 Set Up Openbox Autostart
 
 ```bash
-mkdir -p /home/dan/.config/openbox
-nano /home/dan/.config/openbox/autostart
+mkdir -p /home/pi/.config/openbox
+nano /home/pi/.config/openbox/autostart
 ```
 
 Add:
 ```bash
-# Disable screen blanking and screensaver
+# Disable screen blanking
 xset s off
 xset s noblank
 xset -dpms
 
-# Hide the cursor when idle
+# Hide cursor when idle
 unclutter -idle 0.5 -root &
 
+# Start alarm clock backend
+/home/pi/alarm-clock/venv/bin/python /home/pi/alarm-clock/backend/main.py &
+
+# Wait for backend to start
+sleep 3
+
 # Launch Chromium in kiosk mode
-# (the backend is started by systemd before the desktop session — no sleep needed)
-chromium \
+chromium-browser \
   --kiosk \
   --noerrdialogs \
   --disable-infobars \
@@ -612,38 +528,18 @@ chromium \
   http://localhost:8000 &
 ```
 
-Save and exit.
+### 12.2 Configure Auto-Login to Desktop
 
-### 11.2 Configure Console Auto-Login
-
-**Step 1 — Switch to console boot:**
 ```bash
 sudo raspi-config
 ```
 
-Navigate to: **1 System Options** → **S5 Boot / Auto Login** → **B1 Console**
+Navigate to: **1 System Options** → **S5 Boot / Auto Login** → **B4 Desktop Autologin**
 
-Exit raspi-config (do NOT reboot yet).
-
-**Step 2 — Enable autologin for your user on TTY1:**
-```bash
-sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
-sudo nano /etc/systemd/system/getty@tty1.service.d/autologin.conf
-```
-
-Add (replace `dan` with your username if different):
-```ini
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin dan --noclear %I $TERM
-```
-
-Save and exit. Now reboot — the Pi will auto-login to a console session, which triggers `.bash_profile` → `startx` → Openbox → Chromium kiosk.
-
-### 11.3 Configure X to Start Openbox
+### 12.3 Configure X to Start Openbox
 
 ```bash
-nano /home/dan/.xinitrc
+nano /home/pi/.xinitrc
 ```
 
 Add:
@@ -651,13 +547,13 @@ Add:
 exec openbox-session
 ```
 
-### 11.4 Auto-Start X on Login
+### 12.4 Auto-Start X on Login
 
 ```bash
-nano /home/dan/.bash_profile
+nano /home/pi/.bash_profile
 ```
 
-Add at the bottom:
+Add:
 ```bash
 if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = "1" ]; then
   startx
@@ -666,46 +562,13 @@ fi
 
 ---
 
-## Part 12 — Configure the Touchscreen
-
-### 12.1 Check Orientation
-
-The official RPi touchscreen may need rotation depending on how you mount it.
-To rotate 180 degrees, add to `/boot/firmware/config.txt`:
-
-```
-display_rotate=2
-```
-
-Common values: `0` = normal, `1` = 90°, `2` = 180°, `3` = 270°
-
-### 12.2 Touch Calibration (if needed)
-
-```bash
-sudo apt install -y xinput-calibrator
-xinput_calibrator
-```
-
-Follow the on-screen prompts and save the calibration output to:
-```bash 
-sudo nano /etc/X11/xorg.conf.d/99-calibration.conf
-```
-
----
-
 ## Part 13 — Install the systemd Service
 
-This ensures the alarm clock restarts automatically after a crash or reboot.
-
 ```bash
-sudo cp /home/dan/alarm_clock/systemd/alarm-clock.service /etc/systemd/system/
+sudo cp /home/pi/alarm-clock/systemd/alarm-clock.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable alarm-clock
 sudo systemctl start alarm-clock
-```
-
-Check the service status:
-```bash
 sudo systemctl status alarm-clock
 ```
 
@@ -714,78 +577,57 @@ View live logs:
 journalctl -u alarm-clock -f
 ```
 
-> **Note:** The backend runs as a systemd service and starts before the desktop
-> session. Do not also start it from Openbox autostart — that would launch a
-> second instance and cause port conflicts.
+> **Note:** If using the Openbox autostart method (Part 12), choose one approach
+> for starting the backend — systemd is more robust and recommended.
 
 ---
 
-## Part 14 — Display Brightness Control
-
-The official RPi touchscreen brightness is controlled via:
+## Part 14 — Touch Calibration (if needed)
 
 ```bash
-# Set brightness (0–255)
-echo 100 | sudo tee /sys/class/backlight/rpi_backlight/brightness
+sudo apt install -y xinput-calibrator
+xinput_calibrator
 ```
 
-The Python backend controls this from `hardware.py`. To allow the `pi` user
-to write to the backlight without sudo:
-
+Save output to:
 ```bash
-sudo nano /etc/udev/rules.d/99-backlight.rules
-```
-
-Add:
-```
-SUBSYSTEM=="backlight", ACTION=="add", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
-```
-
-Add pi to the video group:
-```bash
-sudo usermod -a -G video pi
-```
-
-Reload udev rules:
-```bash
-sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo nano /etc/X11/xorg.conf.d/99-calibration.conf
 ```
 
 ---
 
-## Part 15 — Final Checks
-
-Run through this checklist before considering the setup complete:
+## Part 15 — Final Checklist
 
 ```
 Hardware
-[ ] HiFiBerry DAC+ Pro seated firmly on GPIO header
-[ ] DS3231 wired to I2C pins, battery inserted
-[ ] BH1750 wired to I2C pins
-[ ] DHT22 wired to GPIO4 (VCC → 3.3V, GND → GND, DATA → GPIO4 + pull-up)
+[ ] DS3231 wired to I2C, CR2032 battery inserted
+[ ] BH1750 wired to I2C (ADDR pin to GND)
 [ ] Snooze button wired to GPIO17 and GND
-[ ] Passive piezo wired to GPIO13 (Pin 33) and GND (Pin 34) (if fitted)
-[ ] WS2812B data wire on GPIO12, powered from external 5V
+[ ] Power shutdown button wired to GPIO26 via 330Ω and GND
+[ ] Power-on button wired to GPIO3 via 330Ω and GND
+[ ] Active buzzer wired to GPIO13 and GND
+[ ] 74AHCT125 level shifter wired between GPIO12 and WS2812B data
+[ ] WS2812B powered from external 5V, GND shared with Pi
+[ ] MAX98357A #1: I2S lines connected, SD → 3.3V via 100kΩ (Left)
+[ ] MAX98357A #2: I2S lines connected, SD → GND via 100kΩ (Right)
+[ ] Speakers connected to amp screw terminals
 [ ] Touchscreen DSI cable connected
-[ ] Speakers connected via RCA to DAC+ Pro
 
 Software
-[ ] aplay -l shows HiFiBerry DAC+ Pro
+[ ] aplay -l shows I2S DAC device
 [ ] i2cdetect -y 1 shows 0x23 (BH1750) and 0x68 (DS3231)
 [ ] hwclock -r returns correct time
 [ ] chronyc tracking shows time is synced
 [ ] Python venv created and all packages installed
-[ ] config/settings.yaml filled in (timezone, HA URL, MQTT broker, DHT22 pin)
-[ ] .env file created with HA_TOKEN, MQTT_USER, MQTT_PASS
-[ ] Backend logs show "DHT22: XX.X°F  XX.X%RH" on each poll interval
-[ ] Home Assistant shows alarm_clock temperature and humidity sensors
-[ ] systemd service enabled and running (or Openbox autostart configured)
-[ ] Pi reboots cleanly into the kiosk UI
-[ ] WebSocket connection established (check backend logs)
-[ ] Clock face displays correct time and weather widget
-[ ] Snooze button triggers snooze in backend logs
-[ ] Buzzer sounds on test alarm (if fitted)
-[ ] LED strip responds (sunrise effect triggers before alarm)
+[ ] config/settings.yaml filled in
+[ ] systemd service enabled and running
+[ ] Pi reboots into kiosk UI
+[ ] Clock face shows correct time
+[ ] Snooze button triggers snooze in logs
+[ ] Buzzer sounds on test alarm (GPIO13)
+[ ] Both speakers produce audio (speaker-test -c 2 -t wav)
+[ ] LED strip responds to test command
+[ ] Display brightness changes via backlight sysfs
 ```
 
 ---
@@ -793,110 +635,71 @@ Software
 ## Useful Commands Reference
 
 ```bash
-# Check service status
+# Service management
 sudo systemctl status alarm-clock
-
-# View live logs
+sudo systemctl restart alarm-clock
 journalctl -u alarm-clock -f
 
-# Restart the service
-sudo systemctl restart alarm-clock
+# Hardware checks
+sudo i2cdetect -y 1          # Show I2C devices (expect 0x23 and 0x68)
+sudo hwclock -r               # Read RTC time
+sudo hwclock -w               # Write system time to RTC
+chronyc tracking              # NTP sync status
+aplay -l                      # List audio devices
 
-# Check I2C devices
-sudo i2cdetect -y 1
+# Audio
+speaker-test -c 2 -t wav      # Test both speakers
+amixer sset 'Speaker' 80%     # Set ALSA softvol level
 
-# Check audio devices
-aplay -l
-
-# Set DAC volume
-amixer sset 'Digital' 80%
-
-# Check RTC time and NTP sync status
-chronyc tracking
-
-# Quick GPIO check via gpiozero/lgpio
-python3 -c "from gpiozero import Device; print('gpiozero OK, factory:', Device.pin_factory.__class__.__name__)"
-
-# Test DHT22 sensor directly (run from project root, venv active)
-python3 -c "
-import board, adafruit_dht
-dht = adafruit_dht.DHT22(board.D4)
-print(f'Temp: {dht.temperature}°C  Humidity: {dht.humidity}%')
-dht.exit()
-"
-
-# Manually set display brightness (0-255)
+# Display brightness (0–255)
 echo 150 | sudo tee /sys/class/backlight/rpi_backlight/brightness
 
-# Restart kiosk (kill Chromium and let autostart relaunch)
-pkill chromium
+# GPIO test
+python3 -c "import RPi.GPIO as GPIO; GPIO.setmode(GPIO.BCM); print('GPIO OK')"
+
+# Restart kiosk
+pkill chromium-browser
 ```
 
 ---
 
 ## Troubleshooting
 
-**No sound from DAC+ Pro**
-- Run `aplay -l` — if HiFiBerry is not listed, check `/boot/firmware/config.txt` for `dtoverlay=hifiberry-dacplus` and confirm `dtparam=audio=on` is commented out
-- Check speaker power and RCA cable connections
+**No sound from speakers**
+- Run `aplay -l` — confirm I2S DAC is listed
+- Check `dtoverlay=hifiberry-dac` is in `/boot/config.txt` and `dtparam=audio=on` is commented out
+- Verify speaker wires in MAX98357A screw terminals
+- Check SD pin wiring — 100kΩ to 3.3V (Left) and 100kΩ to GND (Right)
+- Run `amixer` to confirm softvol control exists
 
-**Only one speaker plays (left or right channel silent)**
-- Run `speaker-test -D hw:1,0 -c 2 -t wav` and listen for both "Front Left" and "Front Right" announcements
-- If one side is silent, swap both RCA cables: if the silent side follows the cable, replace that cable; if it stays on the same speaker, the speaker's input is faulty
-- Confirm `/etc/asound.conf` sets `defaults.pcm.card 1` so the backend targets the right card
+**RTC not detected (no 0x68 on i2cdetect)**
+- Check SDA/SCL wiring
+- Confirm I2C enabled in raspi-config
+- Confirm `dtoverlay=i2c-rtc,ds3231` in `/boot/config.txt`
 
-**RTC not detected**
-- Run `sudo i2cdetect -y 1` — if `68` is missing, check wiring on SDA/SCL pins
-- Confirm I2C is enabled in `raspi-config`
-- Confirm `dtoverlay=i2c-rtc,ds3231` is in `/boot/firmware/config.txt`
+**BH1750 not detected (no 0x23 on i2cdetect)**
+- Check ADDR pin is tied to GND
+- Verify VCC is 3.3V not 5V
 
-**BH1750 not detected**
-- Run `sudo i2cdetect -y 1` — if `23` is missing, check ADDR pin is tied to GND
-- Both DS3231 and BH1750 share I2C — both should appear at the same time
-
-**Kiosk doesn't start / Pi shows full desktop**
-- Confirm boot mode: `systemctl get-default` should return `multi-user.target`, not `graphical.target`
-- If it returns `graphical.target`, run raspi-config → System Options → Boot/Auto Login → **B1 Console**, then create `/etc/systemd/system/getty@tty1.service.d/autologin.conf` (see Part 11.2)
-- Check `~/.bash_profile` contains the `startx` block and `~/.xinitrc` contains `exec openbox-session`
-- Check `~/.config/openbox/autostart` syntax
-- Run `startx` manually from an SSH session to see X error output
-- Check backend is running: `sudo systemctl status alarm-clock`
-
-**Chromium shows "connection refused"**
-- The backend hasn't started yet — increase the `sleep` delay in the Openbox autostart
-- Check backend logs: `journalctl -u alarm-clock -f`
-
-**Touch input not working or wrong orientation**
-- Check `display_rotate` value in `/boot/firmware/config.txt`
-- Run `xinput_calibrator` to recalibrate
+**Buzzer not sounding**
+- Confirm buzzer is on GPIO13 (Pin 33), not GPIO18
+- Test: `python3 -c "import RPi.GPIO as GPIO; GPIO.setmode(GPIO.BCM); GPIO.setup(13,GPIO.OUT); GPIO.output(13,1)"`
 
 **WS2812B LEDs not lighting**
-- Confirm GPIO12 data connection and external 5V power
+- Confirm 74AHCT125 level shifter is in circuit between GPIO12 and LED data
+- Confirm external 5V power supply for LEDs
 - Confirm GND is shared between external supply and Pi
-- The rpi_ws281x library may need to run as root — check udev rules in Part 8
+- rpi_ws281x may need root — check udev rules
 
-**DHT22 not reading / RuntimeError in logs**
-- DHT22 transient read errors are normal — the library retries automatically and
-  the backend logs them at DEBUG level; isolated errors can be ignored
-- If readings never succeed, check wiring: VCC → 3.3V, GND → GND, DATA → GPIO4
-- Confirm the 4.7kΩ pull-up resistor is present between DATA and VCC (unless
-  your module has one built in)
-- Run the one-line test command from the Useful Commands section above
-- Confirm `libgpiod3` is installed: `dpkg -l libgpiod3`
+**Kiosk doesn't start / Chromium shows "connection refused"**
+- Check backend is running: `sudo systemctl status alarm-clock`
+- Increase sleep delay in Openbox autostart
+- Check backend logs: `journalctl -u alarm-clock -f`
 
-**DHT22 sensors not appearing in Home Assistant**
-- Check MQTT is connected: look for "MQTT connected" in backend logs
-- Confirm MQTT credentials in `.env` match your broker's user/password
-- Check the MQTT broker is reachable: `mosquitto_pub -h homeassistant.local -t test -m hello`
-- In HA, check **Settings → Devices & Services → MQTT** for the alarm-clock device
-- Discovery messages are published at startup — restart the backend service and
-  wait 30 seconds for HA to register the entities
-
-**HA token rejected (401 Unauthorized in logs)**
-- Confirm `HA_TOKEN` in `.env` is the full token (they are very long — ~180 chars)
-- The token is tied to the HA user who created it; confirm that user still exists
-- Regenerate the token: HA → Profile → Security → Long-Lived Access Tokens
+**Touch input wrong orientation**
+- Adjust `display_rotate` in `/boot/config.txt`
+- Run `xinput_calibrator` to recalibrate
 
 ---
 
-*Setup guide version: 1.1 — June 2026*
+*Setup guide version: 1.1 — August 2026*

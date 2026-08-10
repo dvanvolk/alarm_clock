@@ -50,7 +50,7 @@ alarm-clock/
 
 ## Runtime Environment
 
-- **Target hardware:** Raspberry Pi 3, Raspberry Pi OS Lite, Openbox for kiosk windowing; HiFiBerry DAC+ Pro for audio output (RCA → powered speakers, volume via ALSA); DHT22 on GPIO4 for temperature/humidity reporting to HA via MQTT
+- **Target hardware:** Raspberry Pi 3, Raspberry Pi OS Lite, Openbox for kiosk windowing; 2× Adafruit MAX98357A I2S amplifier breakouts driving 2× enclosed 4Ω 3W speakers built into the case (volume via ALSA softvol); DHT22 on GPIO4 for temperature/humidity reporting to HA via MQTT
 - **Python:** 3.11+; backend runs as a systemd service
 - **Frontend:** served by FastAPI's static file hosting, opened by Chromium in kiosk mode
 
@@ -62,7 +62,7 @@ alarm-clock/
 - I2C libraries (`smbus2`, Adafruit CircuitPython) are hardware-specific — mock or skip on non-Pi dev machines.
 - The DS3231 RTC is a fallback time source only; `chrony` syncs NTP → system clock → DS3231. On Bookworm the kernel owns the DS3231 via `i2c-rtc` overlay; read it via `/sys/class/rtc/rtc0/`.
 - Home Assistant integration uses both MQTT Discovery (device registration) and the HA WebSocket API (weather entity polling, Music Assistant service calls).
-- HiFiBerry DAC+ Pro volume is controlled via ALSA — use `subprocess` to call `amixer` or use the `alsaaudio` Python library. Do not use GPIO for volume.
+- The MAX98357A amps have no hardware volume register — volume is controlled via ALSA softvol (control name `"Speaker"`); use `subprocess` to call `amixer` or use the `alsaaudio` Python library. Do not use GPIO for volume.
 - YAML config (`config/settings.yaml`) is the single source of truth for all user settings. The settings UI writes back to it.
 
 ## Commands

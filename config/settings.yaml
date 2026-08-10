@@ -20,7 +20,7 @@ audio:
   fallback_buzzer: true    # use buzzer if Music Assistant unavailable
 
 buzzer:
-  gpio_pin: 13             # BCM GPIO13 = PWM1, Pin 33 (no HiFiBerry conflict)
+  gpio_pin: 13             # BCM GPIO13 = PWM1, Pin 33 (no I2S/MAX98357A conflict)
   melody: "default"        # global fallback melody; overridden per-alarm
   duty_cycle: 50           # PWM duty cycle percent (0–100)
 
