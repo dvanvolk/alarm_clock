@@ -186,7 +186,7 @@ async def lifespan(app: FastAPI):
                 alarm["enabled"] = enabled
             elif switch_name == "weekend" and days & {"sat", "sun"}:
                 alarm["enabled"] = enabled
-        save_config(config)
+        save_alarms(config["alarms"])
         scheduler.reload(config)
         log.info("HA switch: %s alarms → %s", switch_name, "enabled" if enabled else "disabled")
 
