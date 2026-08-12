@@ -6,6 +6,14 @@ const WS_URL = `ws://${location.host}/ws`;
 let ws = null;
 let reconnectDelay = 1000;
 
+let colorDay = "#e8a020";
+let colorNight = "#c0392b";
+let isNight = false;
+
+function applyAccentColor() {
+  document.documentElement.style.setProperty("--accent", isNight ? colorNight : colorDay);
+}
+
 function connect() {
   ws = new WebSocket(WS_URL);
 
@@ -46,12 +54,13 @@ function dispatch(msg) {
 
     case "settings_update":
       document.documentElement.style.setProperty("--seconds-scale", msg.seconds_scale ?? 0.55);
+      document.documentElement.style.setProperty("--clock-size-scale", msg.size_scale ?? 1.0);
       if (msg.font) {
         document.documentElement.style.setProperty("--clock-font", `'${msg.font}', monospace`);
       }
-      if (msg.accent_color) {
-        document.documentElement.style.setProperty("--accent", msg.accent_color);
-      }
+      if (msg.color_day) colorDay = msg.color_day;
+      if (msg.color_night) colorNight = msg.color_night;
+      applyAccentColor();
       break;
 
     case "time_update":
@@ -62,6 +71,10 @@ function dispatch(msg) {
 
     case "brightness_update":
       document.documentElement.style.setProperty("--brightness", `${msg.brightness}%`);
+      if (typeof msg.is_night === "boolean") {
+        isNight = msg.is_night;
+        applyAccentColor();
+      }
       break;
 
     case "alarm_state":

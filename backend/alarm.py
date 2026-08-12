@@ -103,6 +103,7 @@ class AlarmScheduler:
         self._alarms: list[Alarm] = []
         self._state = AlarmState.IDLE
         self._active: Optional[Alarm] = None
+        self._active_entity: str = ""   # resolved media player entity for the current alarm
         self._snooze_until: Optional[datetime] = None
         self._volume_task: Optional[asyncio.Task] = None
         self._buzz_task: Optional[asyncio.Task] = None
@@ -197,9 +198,11 @@ class AlarmScheduler:
         max_brightness = self._sunrise_cfg.get("max_brightness", 255)
         leds.set_full(num_leds, max_brightness)
 
-        # Start sound
+        # Resolve target zone entity at fire time, then start sound
+        self._active_entity = ""
         if alarm.sound == "music_assistant" and self._ha:
-            await self._ha.trigger_music(alarm.music_uri, self._audio_cfg)
+            self._active_entity = await self._ha.get_music_target_entity()
+            await self._ha.trigger_music(alarm.music_uri, self._audio_cfg, self._active_entity)
         elif alarm.sound == "music_assistant":
             log.info("[NO HA] Would play Music Assistant: %s", alarm.music_uri)
         else:
@@ -208,7 +211,7 @@ class AlarmScheduler:
         # Volume ramp — real via HA, stub fallback without it
         if self._ha:
             self._volume_task = asyncio.create_task(
-                self._ha.volume_ramp(self._audio_cfg)
+                self._ha.volume_ramp(self._audio_cfg, self._active_entity)
             )
         else:
             self._volume_task = asyncio.create_task(
@@ -225,7 +228,7 @@ class AlarmScheduler:
         self._cancel_tasks()
         hw.stop_buzz()
         if self._ha:
-            await self._ha.stop_music()
+            await self._ha.stop_music(self._active_entity)
         self._snooze_until = datetime.now() + timedelta(minutes=self._active.snooze_minutes)
         self._state = AlarmState.SNOOZED
         log.info("Snoozed until %s", self._snooze_until.strftime("%H:%M"))
@@ -238,10 +241,11 @@ class AlarmScheduler:
         self._cancel_tasks()
         hw.stop_buzz()
         if self._ha:
-            await self._ha.stop_music()
+            await self._ha.stop_music(self._active_entity)
         leds.clear(self._sunrise_cfg.get("num_leds", 6))
         self._state = AlarmState.IDLE
         self._active = None
+        self._active_entity = ""
         self._snooze_until = None
         log.info("Alarm dismissed")
         await self._manager.broadcast({"type": "alarm_dismissed"})

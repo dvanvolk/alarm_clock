@@ -55,12 +55,29 @@ def save_alarms(alarms: list, path: str = ALARMS_PATH) -> None:
     os.replace(tmp_path, path)
 
 
+# home_assistant keys that load_config() overlays from .env — these must never
+# round-trip back onto disk, only ever live in the environment.
+_HA_ENV_SECRET_KEYS = ("token", "mqtt_user", "mqtt_pass")
+
+
 def save_config(data: dict, path: str = "config/settings.yaml") -> None:
-    """Write config atomically to avoid corruption on a partial write."""
+    """Write config atomically to avoid corruption on a partial write.
+
+    `data` is the live in-memory config, which has env secrets overlaid onto
+    `home_assistant` (see load_config) and `alarms` merged in from alarms.yaml
+    (see load_alarms/save_alarms) for runtime convenience. Neither should be
+    persisted here — secrets must stay in .env only, and alarms already have
+    their own on-disk file — so both are stripped before writing.
+    """
+    to_write = {k: v for k, v in data.items() if k != "alarms"}
+    ha = to_write.get("home_assistant")
+    if ha:
+        to_write["home_assistant"] = {k: v for k, v in ha.items() if k not in _HA_ENV_SECRET_KEYS}
+
     dir_name = os.path.dirname(os.path.abspath(path))
     with tempfile.NamedTemporaryFile(
         "w", dir=dir_name, delete=False, suffix=".tmp", encoding="utf-8"
     ) as tmp:
-        yaml.dump(data, tmp, default_flow_style=False, allow_unicode=True)
+        yaml.dump(to_write, tmp, default_flow_style=False, allow_unicode=True)
         tmp_path = tmp.name
     os.replace(tmp_path, path)

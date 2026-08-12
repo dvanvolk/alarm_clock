@@ -32,7 +32,8 @@ Items marked **[Pi only]** cannot be verified on a Windows dev machine.
 | 2.7 | Next alarm label shows on clock face | e.g., "Tomorrow at 6:30 AM" | |
 | 2.8 | Next alarm label shows "No alarm set" when all disabled | "No alarm set" displayed | |
 | 2.9 | Custom font applies from `clock.font` setting | Font change visible on reload | |
-| 2.10 | Custom accent color applies from `clock.accent_color` | UI accent color changes on reload | |
+| 2.10 | Custom colors apply from `clock.color_day`/`clock.color_night` | Digit color matches day/night ambient light state on reload | |
+| 2.11 | `clock.size_scale` changes clock digit size | Digits scale up/down on reload | |
 
 ---
 
@@ -171,10 +172,10 @@ Items marked **[Pi only]** cannot be verified on a Windows dev machine.
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 13.1 | `brightness_update` WS message received every 60 s | Log or browser console shows brightness messages | |
-| 13.2 | Cover BH1750 sensor | Brightness value drops toward `dim_min_brightness` | |
-| 13.3 | Shine light at BH1750 | Brightness value rises toward `dim_max_brightness` | |
-| 13.4 | `auto_dim: false` in config | No brightness_update messages; brightness static | |
+| 13.1 | `brightness_update` WS message received every 30 s | Log or browser console shows brightness + is_night messages | |
+| 13.2 | Cover BH1750 sensor | Brightness drops toward `dim_min_brightness`; once lux ≤ `dim_low_lux`, `is_night` becomes true and clock switches to `color_night` | |
+| 13.3 | Shine light at BH1750 | Brightness rises toward `dim_max_brightness`; once lux ≥ `dim_high_lux`, `is_night` becomes false and clock switches to `color_day` | |
+| 13.4 | `auto_dim: false` in config | Brightness stays static at `dim_max_brightness`; brightness_update/is_night messages still flow so night-mode color keeps working | |
 
 ---
 
