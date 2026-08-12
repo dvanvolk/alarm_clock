@@ -10,6 +10,7 @@
   --text: #f0f0f0;
   --dim: #888;
   --clock-font: 'Orbitron', monospace;
+  --clock-size-scale: 1;
 }
 
 html, body {
@@ -35,11 +36,12 @@ html, body {
 }
 
 #time {
-  font-size: clamp(3rem, 12vw, 7rem);
+  font-size: calc(clamp(3rem, 12vw, 7rem) * var(--clock-size-scale, 1));
   font-weight: 700;
   color: var(--accent);
   letter-spacing: 0.05em;
   text-shadow: 0 0 20px rgba(232, 160, 32, 0.5);
+  text-shadow: 0 0 20px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 #time .seconds {

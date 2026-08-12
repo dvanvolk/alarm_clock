@@ -4,7 +4,10 @@ clock:
   show_seconds: true
   seconds_scale: 0.55       # seconds font size relative to main time (0.0–1.0)
   font: "Exo 2"          # Orbitron | Share Tech Mono | Rajdhani | Exo 2 | Michroma | Audiowide
-  accent_color: "#e8a020"   # any CSS color — applies to time digits and highlights
+  size_scale: 1.0           # clock digit size multiplier, 0.5–2.0 (1.0 = default size)
+  color_day: "#e8a020"      # digit/accent color while ambient light is bright (day mode)
+  color_night: "#c0392b"    # digit/accent color at night (low ambient light via BH1750;
+                             # switch uses display.dim_low_lux / display.dim_high_lux as hysteresis)
 
 display:
   auto_dim: true

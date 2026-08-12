@@ -23,6 +23,11 @@ config: dict = {}
 scheduler: AlarmScheduler | None = None
 ha_client: HAClient | None = None
 
+# Last known hardware reading — gives hardware_poll_loop hysteresis memory across
+# ticks, and lets newly-connected clients get an immediate day/night picture instead
+# of waiting up to 30s for the next poll.
+_hw_state: dict = {"brightness": 100, "is_night": False}
+
 
 class ConnectionManager:
     def __init__(self):
@@ -82,21 +87,45 @@ async def tick_loop():
         await asyncio.sleep(1)
 
 
-async def hardware_poll_loop():
-    """Poll light sensor every 30 s and push brightness_update."""
-    display_cfg = config.get("display", {})
+def _compute_hw_state(lux: float, display_cfg: dict, previous_is_night: bool) -> tuple[int, bool]:
+    """Compute brightness % and day/night state from a lux reading.
+
+    is_night uses dim_low_lux/dim_high_lux as a hysteresis band (the same
+    thresholds that drive brightness dimming): it flips on once brightness has
+    bottomed out and flips off once brightness is back at its ceiling, holding
+    the previous value in between so it doesn't flicker at the boundary.
+    """
     lux_low = display_cfg.get("dim_low_lux", 20)
     lux_high = display_cfg.get("dim_high_lux", 300)
     br_min = display_cfg.get("dim_min_brightness", 10)
     br_max = display_cfg.get("dim_max_brightness", 100)
     auto_dim = display_cfg.get("auto_dim", True)
 
+    if lux <= lux_low:
+        is_night = True
+    elif lux >= lux_high:
+        is_night = False
+    else:
+        is_night = previous_is_night
+
+    if auto_dim:
+        pct = br_min + (br_max - br_min) * min(max((lux - lux_low) / (lux_high - lux_low), 0), 1)
+    else:
+        pct = br_max
+
+    return round(pct), is_night
+
+
+async def hardware_poll_loop():
+    """Poll light sensor every 30 s and push brightness_update (brightness + is_night)."""
+    display_cfg = config.get("display", {})
+
     while True:
-        if auto_dim:
-            lux = hw.get_lux()
-            pct = br_min + (br_max - br_min) * min(max((lux - lux_low) / (lux_high - lux_low), 0), 1)
-            log.info("BH1750: %.1f lux → brightness %d%%", lux, round(pct))
-            await manager.broadcast({"type": "brightness_update", "brightness": round(pct)})
+        lux = hw.get_lux()
+        pct, is_night = _compute_hw_state(lux, display_cfg, _hw_state["is_night"])
+        _hw_state["brightness"], _hw_state["is_night"] = pct, is_night
+        log.info("BH1750: %.1f lux → brightness %d%% (night=%s)", lux, pct, is_night)
+        await manager.broadcast({"type": "brightness_update", "brightness": pct, "is_night": is_night})
         await asyncio.sleep(30)
 
 
@@ -132,6 +161,9 @@ async def lifespan(app: FastAPI):
     config = load_config()
     config["alarms"] = load_alarms()
     hw.setup_hardware(config)
+    _hw_state["brightness"], _hw_state["is_night"] = _compute_hw_state(
+        hw.get_lux(), config.get("display", {}), previous_is_night=False
+    )
     sunrise_cfg = config.get("sunrise", {})
     leds.setup_leds(
         sunrise_cfg.get("num_leds", 6),
@@ -184,15 +216,26 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-@app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
-    await manager.connect(ws)
-    clock_cfg = config.get("clock", {})
-    await ws.send_text(json.dumps({
+def _settings_update_message(cfg: dict) -> dict:
+    clock_cfg = cfg.get("clock", {})
+    return {
         "type": "settings_update",
         "seconds_scale": clock_cfg.get("seconds_scale", 0.55),
         "font": clock_cfg.get("font", "Orbitron"),
-        "accent_color": clock_cfg.get("accent_color", "#e8a020"),
+        "size_scale": clock_cfg.get("size_scale", 1.0),
+        "color_day": clock_cfg.get("color_day", "#e8a020"),
+        "color_night": clock_cfg.get("color_night", "#c0392b"),
+    }
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    await manager.connect(ws)
+    await ws.send_text(json.dumps(_settings_update_message(config)))
+    await ws.send_text(json.dumps({
+        "type": "brightness_update",
+        "brightness": _hw_state["brightness"],
+        "is_night": _hw_state["is_night"],
     }))
     await ws.send_text(json.dumps({
         "type": "config_update",
@@ -226,12 +269,32 @@ async def handle_message(msg: dict, ws: WebSocket):
     elif mtype == "settings_save":
         new_cfg = msg.get("settings", {})
         dashboard_url = new_cfg.pop("dashboard_url", None)
+        clock_updates = new_cfg.pop("clock", None)
+        config_dirty = False
+
         if dashboard_url is not None:
             config.setdefault("home_assistant", {})["dashboard_url"] = dashboard_url
+            config_dirty = True
+
+        if clock_updates:
+            clock_cfg = config.setdefault("clock", {})
+            if "size_scale" in clock_updates:
+                try:
+                    clock_cfg["size_scale"] = max(0.5, min(2.0, float(clock_updates["size_scale"])))
+                except (TypeError, ValueError):
+                    pass
+            for key in ("color_day", "color_night"):
+                if key in clock_updates:
+                    clock_cfg[key] = clock_updates[key]
+            config_dirty = True
+
+        if config_dirty:
             save_config(config)
+
         if "alarms" in new_cfg:
             config["alarms"] = new_cfg["alarms"]
             save_alarms(config["alarms"])
+
         scheduler.reload(config)
         await manager.broadcast({
             "type": "config_update",
@@ -239,6 +302,8 @@ async def handle_message(msg: dict, ws: WebSocket):
             "buzzer": config.get("buzzer", {}),
             "dashboard_url": config.get("home_assistant", {}).get("dashboard_url", ""),
         })
+        if clock_updates:
+            await manager.broadcast(_settings_update_message(config))
         log.info("Settings saved")
 
     elif mtype == "switch_view":

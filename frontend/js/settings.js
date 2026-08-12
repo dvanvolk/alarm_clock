@@ -45,6 +45,17 @@ function connect() {
       if (urlInput && msg.dashboard_url !== undefined) {
         urlInput.value = msg.dashboard_url;
       }
+    } else if (msg.type === 'settings_update') {
+      const size = document.getElementById('clock-size-scale');
+      const sizeVal = document.getElementById('clock-size-scale-value');
+      if (size && msg.size_scale !== undefined) {
+        size.value = msg.size_scale;
+        if (sizeVal) sizeVal.textContent = Math.round(msg.size_scale * 100) + '%';
+      }
+      const dayInput = document.getElementById('clock-color-day');
+      if (dayInput && msg.color_day) dayInput.value = msg.color_day;
+      const nightInput = document.getElementById('clock-color-night');
+      if (nightInput && msg.color_night) nightInput.value = msg.color_night;
     } else if (msg.type === 'ota_status') {
       handleOtaStatus(msg);
     }
@@ -220,8 +231,19 @@ function saveSettings() {
     };
   });
 
+  const sizeScale  = parseFloat(document.getElementById('clock-size-scale')?.value ?? '1') || 1;
+  const colorDay   = document.getElementById('clock-color-day')?.value || '#e8a020';
+  const colorNight = document.getElementById('clock-color-night')?.value || '#c0392b';
+
   const dashboardUrl = (document.getElementById('dashboard-url')?.value ?? '').trim();
-  sendMsg({ type: 'settings_save', settings: { alarms, dashboard_url: dashboardUrl } });
+  sendMsg({
+    type: 'settings_save',
+    settings: {
+      alarms,
+      dashboard_url: dashboardUrl,
+      clock: { size_scale: sizeScale, color_day: colorDay, color_night: colorNight },
+    },
+  });
   showSaveStatus('Saved', 'ok');
 }
 

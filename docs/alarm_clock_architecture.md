@@ -66,7 +66,7 @@ Python pushes state to the browser; the browser sends user actions back to Pytho
 | Message | Payload | Description |
 |---|---|---|
 | `time_update` | time, date, day | Current time, date, day of week |
-| `brightness_update` | level (0–100) | New brightness level from light sensor |
+| `brightness_update` | level (0–100), is_night | New brightness level from light sensor, plus day/night state (hysteresis on `display.dim_low_lux`/`dim_high_lux`) used to pick `clock.color_day`/`color_night` |
 | `weather_update` | temp, condition, high, low | Weather data from HA |
 | `alarm_state` | alarms list, next_alarm_label | All alarm configs + next alarm human label |
 | `alarm_firing` | alarm label, time | Alarm is going off — trigger alert UI |
