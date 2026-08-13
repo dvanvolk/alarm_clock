@@ -49,18 +49,21 @@ chromium-browser --kiosk --noerrdialogs --disable-infobars http://localhost:8000
 
 ## Config
 
-Edit `config/settings.yaml` to change timezone, alarms, display options, and Home Assistant credentials. The backend picks up changes on the next restart (or via the Settings UI once built — Phase 7).
+Edit `config/settings.yaml` to change timezone, alarms, display options, and Home Assistant credentials, or use the in-app Settings UI, which writes back to this file.
 
 ## Build phases
 
 | Phase | Status | Description |
 |---|---|---|
-| 1 | Done | Backend skeleton — FastAPI, WebSocket, config |
-| 2 | Done | Clock face UI |
-| 3 | Done | Hardware layer (GPIO, I2C, RTC, light sensor) |
-| 4 | Done | Alarm logic — scheduling, snooze, dismiss |
-| 5 | Todo | Home Assistant integration — weather, Music Assistant, MQTT |
-| 6 | Todo | Sunrise LED effect |
-| 7 | Todo | Settings UI |
-| 8 | Todo | HA dashboard idle screen |
-| 9 | Todo | OTA updates |
+| 1 | Built — testing | Backend skeleton — FastAPI, WebSocket, config |
+| 2 | Built — testing | Clock face UI |
+| 3 | Built — testing | Hardware layer (GPIO, I2C, RTC, light sensor) |
+| 4 | Built — testing | Alarm logic — scheduling, snooze, dismiss |
+| 5 | Built — testing | Home Assistant integration — weather, Music Assistant, MQTT |
+| 6 | Built — testing | Sunrise LED effect |
+| 7 | Built — testing | Settings UI |
+| 8 | Built — testing | HA dashboard idle screen |
+| 9 | Built — testing | OTA updates |
+| 10 | Future | Voice control — Wyoming satellite |
+
+See `docs/alarm_clock_architecture.md` for full phase details.
