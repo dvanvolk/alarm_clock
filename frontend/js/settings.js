@@ -5,6 +5,7 @@
 const WS_URL = `ws://${location.host}/ws`;
 let ws = null;
 let reconnectDelay = 1000;
+let reloadOnReconnect = false;
 let currentAlarms = [];
 
 const ALL_DAYS   = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -24,6 +25,10 @@ function connect() {
   ws = new WebSocket(WS_URL);
 
   ws.addEventListener('open', () => {
+    if (reloadOnReconnect) {
+      location.reload();
+      return;
+    }
     const dot = document.getElementById('ws-status');
     if (dot) dot.className = 'connected';
     reconnectDelay = 1000;
@@ -38,7 +43,9 @@ function connect() {
 
   ws.addEventListener('message', (e) => {
     const msg = JSON.parse(e.data);
-    if (msg.type === 'config_update') {
+    if (msg.type === 'reload') {
+      location.reload();
+    } else if (msg.type === 'config_update') {
       currentAlarms = msg.alarms || [];
       renderAlarms(currentAlarms);
       const urlInput = document.getElementById('dashboard-url');
@@ -265,6 +272,7 @@ function sendOtaTrigger() {
 }
 
 function handleOtaStatus(msg) {
+  if (msg.status === 'restarting') reloadOnReconnect = true;
   const el = document.getElementById('ota-status');
   const btn = document.getElementById('btn-update');
   if (!el) return;

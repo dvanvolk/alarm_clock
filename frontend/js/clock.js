@@ -5,6 +5,7 @@
 const WS_URL = `ws://${location.host}/ws`;
 let ws = null;
 let reconnectDelay = 1000;
+let reloadOnReconnect = false;
 
 let colorDay = "#e8a020";
 let colorNight = "#c0392b";
@@ -18,6 +19,10 @@ function connect() {
   ws = new WebSocket(WS_URL);
 
   ws.addEventListener("open", () => {
+    if (reloadOnReconnect) {
+      location.reload();
+      return;
+    }
     document.getElementById("ws-status").className = "connected";
     reconnectDelay = 1000;
   });
@@ -48,6 +53,14 @@ function renderTime(time) {
 
 function dispatch(msg) {
   switch (msg.type) {
+    case "reload":
+      location.reload();
+      break;
+
+    case "ota_status":
+      if (msg.status === "restarting") reloadOnReconnect = true;
+      break;
+
     case "weather_update":
       handleWeatherUpdate(msg);
       break;

@@ -304,6 +304,11 @@ async def handle_message(msg: dict, ws: WebSocket):
         })
         if clock_updates:
             await manager.broadcast(_settings_update_message(config))
+            # Kiosk tabs stay open for weeks and never re-navigate, so a live
+            # settings_update is only picked up by JS that already knows how to
+            # read it. Force a reload too so stale/older clients (or anyone who
+            # skipped a kiosk restart after a code update) stay in sync.
+            await manager.broadcast({"type": "reload"})
         log.info("Settings saved")
 
     elif mtype == "switch_view":

@@ -90,11 +90,16 @@
     const WS_URL = `ws://${location.host}/ws`;
     let ws = null;
     let reconnectDelay = 1000;
+    let reloadOnReconnect = false;
 
     function connect() {
       ws = new WebSocket(WS_URL);
 
       ws.addEventListener('open', () => {
+        if (reloadOnReconnect) {
+          location.reload();
+          return;
+        }
         const dot = document.getElementById('ws-status');
         if (dot) dot.className = 'connected';
         reconnectDelay = 1000;
@@ -109,7 +114,11 @@
 
       ws.addEventListener('message', (e) => {
         const msg = JSON.parse(e.data);
-        if (msg.type === 'config_update' && msg.dashboard_url !== undefined) {
+        if (msg.type === 'reload') {
+          location.reload();
+        } else if (msg.type === 'ota_status' && msg.status === 'restarting') {
+          reloadOnReconnect = true;
+        } else if (msg.type === 'config_update' && msg.dashboard_url !== undefined) {
           setDashboardUrl(msg.dashboard_url);
         } else if (msg.type === 'switch_view' && msg.view !== 'dashboard') {
           handleSwitchView(msg.view);
